@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.21 Thu Sep 19 05:04:18 PDT 2002
+	- Pg reverse-engineering fix: now sets default
+
 0.20 Mon Mar  4 04:58:34 2002
 	- documentation updates
 	- fix Column->new when using named params

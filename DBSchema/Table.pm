@@ -144,6 +144,9 @@ primary key and (unique) index information will only be imported from databases
 with DBIx::DBSchema::DBD drivers (currently MySQL and PostgreSQL), import of
 column names and attributes *should* work for any database.
 
+Note: the _odbc refers to the column types used and nothing else - you do not
+have to have ODBC installed or connect to the database via ODBC.
+
 =cut
 
 %create_params = (

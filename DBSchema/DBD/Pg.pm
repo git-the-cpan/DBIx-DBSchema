@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -33,14 +33,28 @@ This module implements a PostgreSQL-native driver for DBIx::DBSchema.
 sub columns {
   my($proto, $dbh, $table) = @_;
   my $sth = $dbh->prepare(<<END) or die $dbh->errstr;
-    SELECT a.attname, t.typname, a.attlen, a.atttypmod, a.attnotnull
+    SELECT a.attname, t.typname, a.attlen, a.atttypmod, a.attnotnull,
+           a.atthasdef, a.attnum
     FROM pg_class c, pg_attribute a, pg_type t
     WHERE c.relname = '$table'
       AND a.attnum > 0 AND a.attrelid = c.oid AND a.atttypid = t.oid
     ORDER BY a.attnum
 END
   $sth->execute or die $sth->errstr;
+
   map {
+
+    my $default = '';
+    if ( $_->{atthasdef} ) {
+      my $attnum = $_->{attnum};
+      my $d_sth = $dbh->prepare(<<END) or die $dbh->errstr;
+        SELECT substring(d.adsrc for 128) FROM pg_attrdef d, pg_class c
+        WHERE c.relname = '$table' AND c.oid = d.adrelid AND d.adnum = $attnum
+END
+      $d_sth->execute or die $d_sth->errstr;
+
+      $default = $d_sth->fetchrow_arrayref->[0];
+    };
 
     my $len = '';
     if ( $_->{attlen} == -1 && $_->{typname} ne 'text' ) {
@@ -58,7 +72,7 @@ END
       $type,
       ! $_->{'attnotnull'},
       $len,
-      '', #default
+      $default,
       ''  #local
     ];
 
