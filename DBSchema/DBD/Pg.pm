@@ -2,18 +2,11 @@ package DBIx::DBSchema::DBD::Pg;
 
 use strict;
 use vars qw($VERSION @ISA %typemap);
+use DBD::Pg 1.32;
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 @ISA = qw(DBIx::DBSchema::DBD);
-
-use DBD::Pg;
-my $pg_required_version =
-  ( -e '/etc/debian_version' && $INC{'DBD/Pg.pm'} !~ m(^/usr/local/) )
-    ? '1.22'
-    : '1.30';
-eval "use DBD::Pg $pg_required_version;";
-die $@ if length($@);
 
 %typemap = (
   'BLOB' => 'BYTEA',

@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.23 Mon Feb 16 17:35:54 PST 2004
+	- Update Pg dependancy to 1.32
+	- Update the simple load test so it skips DBIx::DBSchema::DBD::Pg if
+          DBD::Pg 1.32 is not installed.
+
 0.22 Thu Oct 23 15:18:21 PDT 2003
 	- Pg reverse-engineering fix: varchar with no limit
 	- Pg needs (unreleased) DBD::Pg 1.30 (or deb 1.22-2... interesting)
