@@ -2,6 +2,7 @@ Changes
 MANIFEST
 MANIFEST.SKIP
 README
+TODO
 Makefile.PL
 DBSchema.pm
 test.pl

@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.15  Fri Nov 24 23:39:16 2000
+	- MySQL handling of BOOL type (change to TINYINT)
+
 0.14  Tue Oct 24 14:43:16 2000
         - MySQL handling of SERIAL type (change to INTEGER AUTO_INCREMENT)
 

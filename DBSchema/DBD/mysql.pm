@@ -4,12 +4,13 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
   'TIMESTAMP' => 'DATETIME',
   'SERIAL'    => 'INTEGER',
+  'BOOL'      => 'TINYINT',
 );
 
 =head1 NAME
