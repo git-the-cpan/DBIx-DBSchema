@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.25 Wed Apr  6 16:12:38 PDT 2005
+	- depend on DBD::Pg 1.32 or 1.41+ (1.40 was bunk)
+
 0.24 Fri Mar 11 02:20:55 PST 2005
 	- Oracle driver from Daniel Hanks <hanksdc@about-inc.com> and Peter
           Bowen <pbowen@aboutws.com>.

@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.24";
+$VERSION = "0.25";
 
 =head1 NAME
 
