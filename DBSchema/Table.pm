@@ -343,19 +343,23 @@ sub sql_create_table {
     push @columns, map "INDEX ($_)", $self->index->sql_list;
   }
 
-  my @r =
+  my $indexnum = 1;
+
+  my @r = (
     "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n",
     ( map {
-      my($index) = $self->name. "__". $_ . "_index";
-      $index =~ s/,\s*/_/g;
+      #my($index) = $self->name. "__". $_ . "_idx";
+      #$index =~ s/,\s*/_/g;
+      my $index = $self->name. $indexnum++;
       "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
     } $self->unique->sql_list ),
     ( map {
-      my($index) = $self->name. "__". $_ . "_index";
-      $index =~ s/,\s*/_/g;
+      #my($index) = $self->name. "__". $_ . "_idx";
+      #$index =~ s/,\s*/_/g;
+      my $index = $self->name. $indexnum++;
       "CREATE INDEX $index ON ". $self->name. " ($_)\n"
     } $self->index->sql_list ),
-  ;  
+  );  
   $dbh->disconnect if $created_dbh;
   @r;
 }
