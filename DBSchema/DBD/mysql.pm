@@ -9,6 +9,7 @@ $VERSION = '0.02';
 
 %typemap = (
   'TIMESTAMP' => 'DATETIME',
+  'SERIAL'    => 'INTEGER',
 );
 
 =head1 NAME

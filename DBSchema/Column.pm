@@ -241,7 +241,8 @@ sub line {
 
   #this should be a callback into the driver
   if ( $driver eq 'mysql' ) { #yucky mysql hack
-    $null ||= "NOT NULL"
+    $null ||= "NOT NULL";
+    $self->local('AUTO_INCREMENT') if uc($self->type) eq 'SERIAL';
   } elsif ( $driver eq 'Pg' ) { #yucky Pg hack
     $null ||= "NOT NULL";
     $null =~ s/^NULL$//;

@@ -297,12 +297,10 @@ a DBI connection will be opened and the quoting and type mapping will be more
 reliable.
 
 If passed a DBI data source (or handle) such as `DBI:mysql:database', will use
-MySQL-specific syntax.  PostgreSQL is also supported (requires no special
-syntax).  Non-standard syntax for other engines (if applicable) may also be
-supported in the future.
+MySQL- or PostgreSQL-specific syntax.  Non-standard syntax for other engines
+(if applicable) may also be supported in the future.
 
 =cut
-
 
 sub sql_create_table { 
   my($self, $dbh) = (shift, shift);
@@ -325,9 +323,21 @@ sub sql_create_table {
   }
   #eofalse
 
+#  if ( $driver eq 'Pg' && $self->primary_key ) {
+#    my $pcolumn = $self->column( (
+#      grep { $self->column($_)->name eq $self->primary_key } $self->columns
+#    )[0] );
+#    $pcolumn->type('serial') if lc($pcolumn->type) eq 'integer';
+##    $pcolumn->local( $pcolumn->local. ' PRIMARY KEY' );
+##    $self->primary_key('');
+#    #prolly shoudl change it back afterwords :/
+#  }
+
   my(@columns)=map { $self->column($_)->line($dbh) } $self->columns;
+
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
-    if $self->primary_key;
+    if $self->primary_key && $driver ne 'Pg';
+
   if ( $driver eq 'mysql' ) { #yucky mysql hack
     push @columns, map "UNIQUE ($_)", $self->unique->sql_list;
     push @columns, map "INDEX ($_)", $self->index->sql_list;
@@ -378,6 +388,9 @@ the same terms as Perl itself.
 
 sql_create_table() has database-specific foo that probably ought to be
 abstracted into the DBIx::DBSchema::DBD:: modules.
+
+sql_create_table may change or destroy the object's data.  If you need to use
+the object after sql_create_table, make a copy beforehand.
 
 Some of the logic in new_odbc might be better abstracted into Column.pm etc.
 

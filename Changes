@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.14  Tue Oct 24 14:43:16 2000
+        - MySQL handling of SERIAL type (change to INTEGER AUTO_INCREMENT)
+
 0.13  Wed Oct 11 10:47:13 2000
         - fixed up type mapping foo, added default values, added named
           parameters to Column->new, fixed quoting of default values
