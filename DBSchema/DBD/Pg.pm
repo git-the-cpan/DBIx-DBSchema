@@ -8,7 +8,8 @@ $VERSION = '0.02';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
-  'BLOB' => 'TEXT',
+  'BLOB' => 'BYTEA',
+  'LONG VARBINARY' => 'BYTEA',
 );
 
 =head1 NAME

@@ -8,9 +8,10 @@ $VERSION = '0.03';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
-  'TIMESTAMP' => 'DATETIME',
-  'SERIAL'    => 'INTEGER',
-  'BOOL'      => 'TINYINT',
+  'TIMESTAMP'      => 'DATETIME',
+  'SERIAL'         => 'INTEGER',
+  'BOOL'           => 'TINYINT',
+  'LONG VARBINARY' => 'LONGBLOB',
 );
 
 =head1 NAME

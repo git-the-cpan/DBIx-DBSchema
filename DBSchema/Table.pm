@@ -3,7 +3,7 @@ package DBIx::DBSchema::Table;
 use strict;
 use vars qw(@ISA %create_params);
 #use Carp;
-use Exporter;
+#use Exporter;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
@@ -19,12 +19,24 @@ DBIx::DBSchema::Table - Table objects
 
   use DBIx::DBSchema::Table;
 
+  #old style (depriciated)
   $table = new DBIx::DBSchema::Table (
     "table_name",
     "primary_key",
     $dbix_dbschema_colgroup_unique_object,
     $dbix_dbschema_colgroup_index_object,
     @dbix_dbschema_column_objects,
+  );
+
+  #new style (preferred), pass a hashref of parameters
+  $table = new DBIx::DBSchema::Table (
+    {
+      table       => "table_name",
+      primary_key => "primary_key",
+      unique      => $dbix_dbschema_colgroup_unique_object,
+      'index'     => $dbix_dbschema_colgroup_index_object,
+      columns     => \@dbix_dbschema_column_objects,
+    }
   );
 
   $table->addcolumn ( $dbix_dbschema_column_object );
@@ -63,34 +75,59 @@ DBIx::DBSchema::Table objects represent a single database table.
 
 =item new [ TABLE_NAME [ , PRIMARY_KEY [ , UNIQUE [ , INDEX [ , COLUMN... ] ] ] ] ]
 
-Creates a new DBIx::DBSchema::Table object.  TABLE_NAME is the name of the
-table.  PRIMARY_KEY is the primary key (may be empty).  UNIQUE is a
-DBIx::DBSchema::ColGroup::Unique object (see
+=item new HASHREF
+
+Creates a new DBIx::DBSchema::Table object.  The preferred usage is to pass a
+hash reference of named parameters.
+
+  {
+    name        => TABLE_NAME,
+    primary_key => PRIMARY_KEY,
+    unique      => UNIQUE,
+    'index'     => INDEX,
+    columns     => COLUMNS
+  }
+
+TABLE_NAME is the name of the table.  PRIMARY_KEY is the primary key (may be
+empty).  UNIQUE is a DBIx::DBSchema::ColGroup::Unique object (see
 L<DBIx::DBSchema::ColGroup::Unique>).  INDEX is a
 DBIx::DBSchema::ColGroup::Index object (see
-L<DBIx::DBSchema::ColGroup::Index>).  The rest of the arguments should be
+L<DBIx::DBSchema::ColGroup::Index>).  COLUMNS is a reference to an array of
 DBIx::DBSchema::Column objects (see L<DBIx::DBSchema::Column>).
 
 =cut
 
 sub new {
-  my($proto,$name,$primary_key,$unique,$index,@columns)=@_;
+  my $proto = shift;
+  my $class = ref($proto) || $proto;
 
-  my(%columns) = map { $_->name, $_ } @columns;
-  my(@column_order) = map { $_->name } @columns;
+  my $self;
+  if ( ref($_[0]) ) {
+
+    $self = shift;
+    $self->{column_order} = [ map { $_->_name } @{$self->{columns}} ];
+    $self->{columns} = { map { $_->name, $_ } @{$self->{columns}} };
+
+  } else {
+
+    my($name,$primary_key,$unique,$index,@columns) = @_;
+
+    my %columns = map { $_->name, $_ } @columns;
+    my @column_order = map { $_->name } @columns;
+
+    $self = {
+      'name'         => $name,
+      'primary_key'  => $primary_key,
+      'unique'       => $unique,
+      'index'        => $index,
+      'columns'      => \%columns,
+      'column_order' => \@column_order,
+    };
+
+  }
 
   #check $primary_key, $unique and $index to make sure they are $columns ?
   # (and sanity check?)
-
-  my $class = ref($proto) || $proto;
-  my $self = {
-    'name'         => $name,
-    'primary_key'  => $primary_key,
-    'unique'       => $unique,
-    'index'        => $index,
-    'columns'      => \%columns,
-    'column_order' => \@column_order,
-  };
 
   bless ($self, $class);
 
@@ -338,28 +375,28 @@ sub sql_create_table {
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
     if $self->primary_key && $driver ne 'Pg';
 
-  if ( $driver eq 'mysql' ) { #yucky mysql hack
-    push @columns, map "UNIQUE ($_)", $self->unique->sql_list;
-    push @columns, map "INDEX ($_)", $self->index->sql_list;
-  }
-
   my $indexnum = 1;
 
   my @r = (
-    "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n",
-    ( map {
-      #my($index) = $self->name. "__". $_ . "_idx";
-      #$index =~ s/,\s*/_/g;
-      my $index = $self->name. $indexnum++;
-      "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
-    } $self->unique->sql_list ),
-    ( map {
-      #my($index) = $self->name. "__". $_ . "_idx";
-      #$index =~ s/,\s*/_/g;
-      my $index = $self->name. $indexnum++;
-      "CREATE INDEX $index ON ". $self->name. " ($_)\n"
-    } $self->index->sql_list ),
-  );  
+    "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n"
+  );
+
+  push @r, map {
+                 #my($index) = $self->name. "__". $_ . "_idx";
+                 #$index =~ s/,\s*/_/g;
+                 my $index = $self->name. $indexnum++;
+                 "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
+               } $self->unique->sql_list
+    if $self->unique;
+
+  push @r, map {
+                 #my($index) = $self->name. "__". $_ . "_idx";
+                 #$index =~ s/,\s*/_/g;
+                 my $index = $self->name. $indexnum++;
+                 "CREATE INDEX $index ON ". $self->name. " ($_)\n"
+               } $self->index->sql_list
+    if $self->index;
+
   $dbh->disconnect if $created_dbh;
   @r;
 }
@@ -379,6 +416,9 @@ sub _null_sth {
 =head1 AUTHOR
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
+
+Thanks to Mark Ethan Trostler <mark@zzo.com> for a patch to allow tables
+with no indices.
 
 =head1 COPYRIGHT
 

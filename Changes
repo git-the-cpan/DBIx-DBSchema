@@ -1,5 +1,15 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.17  Sat Jul  7 17:55:33 2001
+	- Rework Table->new interface for named params
+	- Fixes for Pg blobs, yay!
+	- MySQL doesn't need non-standard index syntax anymore (since 3.22).
+	- patch from Mark Ethan Trostler <mark@zzo.com> for generating
+	  tables without indices.
+
+0.16  Fri Jan  5 15:55:50 2001
+	- Don't overflow index names.
+
 0.15  Fri Nov 24 23:39:16 2000
 	- MySQL handling of BOOL type (change to TINYINT)
 

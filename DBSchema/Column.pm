@@ -33,7 +33,7 @@ DBIx::DBSchema::Column - Column objects
   $column->name( 'name' );
 
   $sql_type = $column->type;
-  $column->sql_type( 'sql_type' );
+  $column->type( 'sql_type' );
 
   $null = $column->null;
   $column->null( 'NULL' );
