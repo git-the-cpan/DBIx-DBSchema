@@ -3,15 +3,19 @@ package DBIx::DBSchema::DBD;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 =head1 NAME
 
-DBIx::DBSchema::DBD - DBIx::DBSchema Driver Writer's Guide
+DBIx::DBSchema::DBD - DBIx::DBSchema Driver Writer's Guide and Base Class
 
 =head1 SYNOPSIS
 
   perldoc DBIx::DBSchema::DBD
+
+  package DBIx::DBSchema::DBD::FooBase
+  use DBIx::DBSchmea::DBD;
+  @ISA = qw(DBIx::DBSchema::DBD);
 
 =head1 DESCRIPTION
 
@@ -24,8 +28,25 @@ following class methods:
 =item columns CLASS DBI_DBH TABLE
 
 Given an active DBI database handle, return a listref of listrefs (see
-L<perllol>), each containing five elements: column name, column type,
-nullability, column length, and a field reserved for driver-specific use.
+L<perllol>), each containing six elements: column name, column type,
+nullability, column length, column default, and a field reserved for
+driver-specific use.
+
+=item column CLASS DBI_DBH TABLE COLUMN
+
+Same as B<columns> above, except return the listref for a single column.  You
+can inherit from DBIx::DBSchema::DBD to provide this function.
+
+=cut
+
+sub column {
+  my($proto, $dbh, $table, $column) = @_;
+  #@a = grep { $_->[0] eq $column } @{ $proto->columns( $dbh, $table ) };
+  #$a[0];
+  @{ [
+    grep { $_->[0] eq $column } @{ $proto->columns( $dbh, $table ) }
+  ] }[0]; #force list context on grep, return scalar of first element
+}
 
 =item primary_key CLASS DBI_DBH TABLE
 
@@ -61,6 +82,8 @@ This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
+
+%typemap needs to be documented.
 
 =head1 SEE ALSO
 

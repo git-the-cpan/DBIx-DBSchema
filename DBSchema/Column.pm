@@ -16,11 +16,18 @@ DBIx::DBSchema::Column - Column objects
 
   use DBIx::DBSchema::Column;
 
-  $column = new DBIx::DBSchema::Column ( $name, $sql_type, '' );
-  $column = new DBIx::DBSchema::Column ( $name, $sql_type, 'NULL' );
-  $column = new DBIx::DBSchema::Column ( $name, $sql_type, '', $length );
-  $column = new DBIx::DBSchema::Column ( $name, $sql_type, 'NULL', $length );
-  $column = new DBIx::DBSchema::Column ( $name, $sql_type, 'NULL', $length, $local );
+  #named params with a hashref (preferred)
+  $column = new DBIx::DBSchema::Column ( {
+    'name'    => 'column_name',
+    'type'    => 'varchar'
+    'null'    => 'NOT NULL',
+    'length'  => 64,
+    'default' => '
+    'local'   => '',
+  } );
+
+  #list
+  $column = new DBIx::DBSchema::Column ( $name, $sql_type, $nullability, $length, $default, $local );
 
   $name = $column->name;
   $column->name( 'name' );
@@ -37,6 +44,9 @@ DBIx::DBSchema::Column - Column objects
   $column->length( '10' );
   $column->length( '8,2' );
 
+  $default = $column->default;
+  $column->default( 'Roo' );
+
   $sql_line = $column->line;
   $sql_line = $column->line($datasrc);
 
@@ -49,31 +59,35 @@ L<DBIx::DBSchema::Table>).
 
 =over 4
 
-=item new [ NAME [ , SQL_TYPE [ , NULL [ , LENGTH  [ , LOCAL ] ] ] ] ]
+=item new HASHREF
 
-Creates a new DBIx::DBSchema::Column object.  NAME is the name of the column.
-SQL_TYPE is the SQL data type.  NULL is the nullability of the column (the
-empty string is equivalent to `NOT NULL').  LENGTH is the SQL length of the
-column.  LOCAL is reserved for database-specific information.
+=item new [ name [ , type [ , null [ , length  [ , default [ , local ] ] ] ] ] ]
+
+Creates a new DBIx::DBSchema::Column object.  Takes a hashref of named
+parameters, or a list.  B<name> is the name of the column.  B<type> is the SQL
+data type.  B<null> is the nullability of the column (intrepreted using Perl's
+rules for truth, with one exception: `NOT NULL' is false).  B<length> is the
+SQL length of the column.  B<default> is the default value of the column.
+B<local> is reserved for database-specific information.
 
 =cut
 
 sub new {
-  my($proto,$name,$type,$null,$length,$local)=@_;
-
-  #croak "Illegal name: $name" if grep $name eq $_, @reserved_words;
-
-  $null =~ s/^NOT NULL$//i;
-  $null = 'NULL' if $null;
-
+  my $proto = shift;
   my $class = ref($proto) || $proto;
-  my $self = {
-    'name'   => $name,
-    'type'   => $type,
-    'null'   => $null,
-    'length' => $length,
-    'local'  => $local,
-  };
+
+  my $self;
+  if ( ref($_[0]) ) {
+    $self = shift;
+  } else {
+    $self = { map { $_ => shift } qw(name type null length default local) };
+  }
+
+  #croak "Illegal name: ". $self->{'name'}
+  #  if grep $self->{'name'} eq $_, @reserved_words;
+
+  $self->{'null'} =~ s/^NOT NULL$//i;
+  $self->{'null'} = 'NULL' if $self->{'null'};
 
   bless ($self, $class);
 
@@ -143,6 +157,22 @@ sub length {
   }
 }
 
+=item default [ LOCAL ]
+
+Returns or sets the default value.
+
+=cut
+
+sub default {
+  my($self,$value)=@_;
+  if ( defined($value) ) {
+    $self->{'default'} = $value;
+  } else {
+    $self->{'default'};
+  }
+}
+
+
 =item local [ LOCAL ]
 
 Returns or sets the database-specific field.
@@ -158,11 +188,19 @@ sub local {
   }
 }
 
-=item line [ $datasrc ]
+=item line [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
 
 Returns an SQL column definition.
 
-If passed a DBI data source such as `DBI:mysql:database' or
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and the quoting and type mapping will be more
+reliable.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database' or
 `DBI:Pg:dbname=database', will use syntax specific to that database engine.
 Currently supported databases are MySQL and PostgreSQL.  Non-standard syntax
 for other engines (if applicable) may also be supported in the future.
@@ -170,24 +208,61 @@ for other engines (if applicable) may also be supported in the future.
 =cut
 
 sub line {
-  my($self,$datasrc)=@_;
-  my($null)=$self->null;
-  if ( $datasrc =~ /^dbi:mysql:/i ) { #yucky mysql hack
-    $null ||= "NOT NULL"
+  my($self,$dbh) = (shift, shift);
+
+  my $created_dbh = 0;
+  unless ( ref($dbh) || ! @_ ) {
+    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
+    my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
+    $created_dbh = 1;
   }
-  if ( $datasrc =~ /^dbi:pg/i ) { #yucky Pg hack
+  
+  my $driver = DBIx::DBSchema::_load_driver($dbh);
+  my %typemap;
+  %typemap = eval "\%DBIx::DBSchema::DBD::${driver}::typemap" if $driver;
+  my $type = defined( $typemap{uc($self->type)} )
+    ? $typemap{uc($self->type)}
+    : $self->type;
+
+  my $null = $self->null;
+
+  my $default;
+  if ( defined($self->default) && $self->default ne ''
+       && ref($dbh)
+       # false laziness: nicked from FS::Record::_quote
+       && ( $self->default !~ /^\-?\d+(\.\d+)?$/
+            || $type =~ /(char|binary|blob|text)$/i
+          )
+  ) {
+    $default = $dbh->quote($self->default);
+  } else {
+    $default = $self->default;
+  }
+
+  #this should be a callback into the driver
+  if ( $driver eq 'mysql' ) { #yucky mysql hack
+    $null ||= "NOT NULL"
+  } elsif ( $driver eq 'Pg' ) { #yucky Pg hack
     $null ||= "NOT NULL";
     $null =~ s/^NULL$//;
   }
-  join(' ',
+
+  my @r = join(' ',
     $self->name,
-    $self->type. ( $self->length ? '('.$self->length.')' : '' ),
+    $type. ( $self->length ? '('.$self->length.')' : '' ),
     $null,
-    ( ( $datasrc =~ /^dbi:mysql:/i )
+    ( ( defined($default) && $default ne '' )
+      ? 'DEFAULT '. $default
+      : ''
+    ),
+    ( ( $driver eq 'mysql' )
       ? $self->local
       : ''
     ),
   );
+  $dbh->disconnect if $created_dbh;
+  @r;
+
 }
 
 =back

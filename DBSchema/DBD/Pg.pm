@@ -1,9 +1,15 @@
 package DBIx::DBSchema::DBD::Pg;
 
 use strict;
-use vars qw($VERSION);
+use vars qw($VERSION @ISA %typemap);
+use DBIx::DBSchema::DBD;
 
-$VERSION = '0.01';
+$VERSION = '0.02';
+@ISA = qw(DBIx::DBSchema::DBD);
+
+%typemap = (
+  'BLOB' => 'TEXT',
+);
 
 =head1 NAME
 
@@ -41,7 +47,8 @@ END
         ? $_->{'atttypmod'} - 4
         : ''
       ),
-      ''
+      '', #default
+      ''  #local
     ]
   } @{ $sth->fetchall_arrayref({}) };
 }
@@ -127,6 +134,8 @@ the same terms as Perl itself.
 =head1 BUGS
 
 Yes.
+
+columns doesn't return column default information.
 
 =head1 SEE ALSO
 

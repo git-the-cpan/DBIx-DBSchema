@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.13  Wed Oct 11 10:47:13 2000
+        - fixed up type mapping foo, added default values, added named
+          parameters to Column->new, fixed quoting of default values
+
 0.11  Sun Sep 28 02:16:25 2000
         - oops, original verison got 0.10, so this one will get 0.11
 

@@ -3,7 +3,7 @@ package DBIx::DBSchema;
 use strict;
 use vars qw(@ISA $VERSION);
 #use Exporter;
-#use Carp qw(verbose);
+use Carp qw(confess);
 use DBI;
 use FreezeThaw qw(freeze thaw cmpStr);
 use DBIx::DBSchema::Table;
@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.11";
+$VERSION = "0.13";
 
 =head1 NAME
 
@@ -39,11 +39,13 @@ DBIx::DBSchema - Database-independent schema objects
 
   $DBIx_DBSchema_table_object = $schema->table("table_name");
 
-  @sql = $schema->sql($dsn);
+  @sql = $schema->sql($dbh);
+  @sql = $schema->sql($dsn, $username, $password);
+  @sql = $schema->sql($dsn); #doesn't connect to database - less reliable
 
   $perl_code = $schema->pretty_print;
   %hash = eval $perl_code;
-  $schema = pretty_read DBIx::DBSchema \%hash;
+  use DBI qw(:sql_types); $schema = pretty_read DBIx::DBSchema \%hash;
 
 =head1 DESCRIPTION
 
@@ -83,7 +85,7 @@ sub new {
 
 }
 
-=item new_odbc DATABASE_HANDLE || DATA_SOURCE USERNAME PASSWORD [ ATTR ]
+=item new_odbc DATABASE_HANDLE | DATA_SOURCE USERNAME PASSWORD [ ATTR ]
 
 Creates a new DBIx::DBSchema object from an existing data source, which can be
 specified by passing an open DBI database handle, or by passing the DBI data
@@ -105,7 +107,7 @@ sub new_odbc {
   );
 }
 
-=item new_native DATABASE_HANDLE || DATA_SOURCE USERNAME PASSWORD [ ATTR ]
+=item new_native DATABASE_HANDLE | DATA_SOURCE USERNAME PASSWORD [ ATTR ]
 
 Creates a new DBIx::DBSchema object from an existing data source, which can be
 specified by passing an open DBI database handle, or by passing the DBI data
@@ -189,22 +191,37 @@ sub table {
   $self->{'tables'}->{$table};
 }
 
-=item sql_string [ DATASRC ]
+=item sql [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
 
 Returns a list of SQL `CREATE' statements for this schema.
 
-If passed a DBI data source such as `DBI:mysql:database' or
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and the quoting and type mapping will be more
+reliable.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database' or
 `DBI:Pg:dbname=database', will use syntax specific to that database engine.
 Currently supported databases are MySQL and PostgreSQL.
 
-If not passed a data source, or if there is no driver for the specified
-database, will attempt to use generic SQL syntax.
+If not passed a data source (or handle), or if there is no driver for the
+specified database, will attempt to use generic SQL syntax.
 
 =cut
 
 sub sql {
-  my($self, $datasrc) = @_;
-  map { $self->table($_)->sql_create_table($datasrc); } $self->tables;
+  my($self, $dbh) = (shift, shift);
+  my $created_dbh = 0;
+  unless ( ref($dbh) || ! @_ ) {
+    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
+    $created_dbh = 1;
+  }
+  my @r = map { $self->table($_)->sql_create_table($dbh); } $self->tables;
+  $dbh->disconnect if $created_dbh;
+  @r;
 }
 
 =item pretty_print
@@ -232,6 +249,7 @@ sub pretty_print {
                          "'". $self->table($table)->column($_)->type. "', ".
                          "'". $self->table($table)->column($_)->null. "', ". 
                          "'". $self->table($table)->column($_)->length. "', ".
+                         "'". $self->table($table)->column($_)->default. "', ".
                          "'". $self->table($table)->column($_)->local. "',\n"
                        } $self->table($table)->columns
           ).
@@ -265,7 +283,7 @@ sub pretty_read {
     my(@columns);
     while ( @{$href->{$_}{'columns'}} ) {
       push @columns, DBIx::DBSchema::Column->new(
-        splice @{$href->{$_}{'columns'}}, 0, 5
+        splice @{$href->{$_}{'columns'}}, 0, 6
       );
     }
     DBIx::DBSchema::Table->new(
@@ -282,7 +300,15 @@ sub pretty_read {
 
 sub _load_driver {
   my($dbh) = @_;
-  my $driver = $dbh->{Driver}->{Name};
+  my $driver;
+  if ( ref($dbh) ) {
+    $driver = $dbh->{Driver}->{Name};
+  } else {
+    $dbh =~ s/^dbi:(\w*?)(?:\((.*?)\))?://i #nicked from DBI->connect
+                        or '' =~ /()/; # ensure $1 etc are empty if match fails
+    $driver = $1 or confess "can't parse data source: $dbh";
+  }
+
   #require "DBIx/DBSchema/DBD/$driver.pm";
   #$driver;
   eval 'require "DBIx/DBSchema/DBD/$driver.pm"' and $driver;
@@ -317,6 +343,9 @@ Each DBIx::DBSchema object should have a name which corresponds to its name
 within the SQL database engine (DBI data source).
 
 pretty_print is actually pretty ugly.
+
+Perhaps pretty_read should eval column types so that we can use DBI
+qw(:sql_types) here instead of externally.
 
 =head1 SEE ALSO
 

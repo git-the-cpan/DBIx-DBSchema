@@ -1,9 +1,15 @@
 package DBIx::DBSchema::DBD::mysql;
 
 use strict;
-use vars qw($VERSION);
+use vars qw($VERSION @ISA %typemap);
+use DBIx::DBSchema::DBD;
 
-$VERSION = '0.01';
+$VERSION = '0.02';
+@ISA = qw(DBIx::DBSchema::DBD);
+
+%typemap = (
+  'TIMESTAMP' => 'DATETIME',
+);
 
 =head1 NAME
 
@@ -31,7 +37,14 @@ sub columns {
     $_->{'Type'} =~ /^(\w+)\(?([\d\,]+)?\)?( unsigned)?$/
       or die "Illegal type: ". $_->{'Type'}. "\n";
     my($type, $length) = ($1, $2);
-    [ $_->{'Field'}, $type, $_->{'Null'}, $length, $_->{'Extra'} ]
+    [
+      $_->{'Field'},
+      $type,
+      $_->{'Null'},
+      $length,
+      $_->{'Default'},
+      $_->{'Extra'}
+    ]
   } @{ $sth->fetchall_arrayref( {} ) };
 }
 

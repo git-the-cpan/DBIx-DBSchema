@@ -45,8 +45,13 @@ DBIx::DBSchema::Table - Table objects
 
   $dbix_dbschema_column_object = $table->column("column");
 
-  @sql_statements = $table->sql_create_table;
+  #preferred
+  @sql_statements = $table->sql_create_table $dbh;
+  @sql_statements = $table->sql_create_table $datasrc, $username, $password;
+
+  #possible problems
   @sql_statements = $table->sql_create_table $datasrc;
+  @sql_statements = $table->sql_create_table;
 
 =head1 DESCRIPTION
 
@@ -137,10 +142,13 @@ sub new_odbc {
       new DBIx::DBSchema::Column
           $_,
           $type_info->{'TYPE_NAME'},
+          #"SQL_". uc($type_info->{'TYPE_NAME'}),
           $sth->{NULLABLE}->[$sthpos],
-          &{
-            $create_params{ $type_info->{CREATE_PARAMS} }
-          }( $sth, $sthpos++ )
+          &{ $create_params{ $type_info->{CREATE_PARAMS} } }( $sth, $sthpos++ ),          $driver && #default
+            ${ [
+              eval "DBIx::DBSchema::DBD::$driver->column(\$dbh, \$name, \$_)"
+            ] }[4]
+          # DB-local
     } @{$sth->{NAME}}
   );
 }
@@ -276,40 +284,70 @@ sub column {
   $self->{'columns'}->{$column};
 }
 
-=item sql_create_table [ DATASRC ]
+=item sql_create_table [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
 
 Returns a list of SQL statments to create this table.
 
-If passed a DBI data source such as `DBI:mysql:database', will use
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and the quoting and type mapping will be more
+reliable.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database', will use
 MySQL-specific syntax.  PostgreSQL is also supported (requires no special
 syntax).  Non-standard syntax for other engines (if applicable) may also be
 supported in the future.
 
 =cut
 
+
 sub sql_create_table { 
-  my($self,$datasrc)=@_;
-  my(@columns)=map { $self->column($_)->line($datasrc) } $self->columns;
+  my($self, $dbh) = (shift, shift);
+
+  my $created_dbh = 0;
+  unless ( ref($dbh) || ! @_ ) {
+    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
+    my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
+    $created_dbh = 1;
+  }
+  #false laziness: nicked from DBSchema::_load_driver
+  my $driver;
+  if ( ref($dbh) ) {
+    $driver = $dbh->{Driver}->{Name};
+  } else {
+    my $discard = $dbh;
+    $discard =~ s/^dbi:(\w*?)(?:\((.*?)\))?://i #nicked from DBI->connect
+                        or '' =~ /()/; # ensure $1 etc are empty if match fails
+    $driver = $1 or die "can't parse data source: $dbh";
+  }
+  #eofalse
+
+  my(@columns)=map { $self->column($_)->line($dbh) } $self->columns;
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
     if $self->primary_key;
-  if ( $datasrc =~ /^dbi:mysql:/i ) { #yucky mysql hack
+  if ( $driver eq 'mysql' ) { #yucky mysql hack
     push @columns, map "UNIQUE ($_)", $self->unique->sql_list;
     push @columns, map "INDEX ($_)", $self->index->sql_list;
   }
 
-  "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n",
-  ( map {
-    my($index) = $self->name. "__". $_ . "_index";
-    $index =~ s/,\s*/_/g;
-    "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
-  } $self->unique->sql_list ),
-  ( map {
-    my($index) = $self->name. "__". $_ . "_index";
-    $index =~ s/,\s*/_/g;
-    "CREATE INDEX $index ON ". $self->name. " ($_)\n"
-  } $self->index->sql_list ),
+  my @r =
+    "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n",
+    ( map {
+      my($index) = $self->name. "__". $_ . "_index";
+      $index =~ s/,\s*/_/g;
+      "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
+    } $self->unique->sql_list ),
+    ( map {
+      my($index) = $self->name. "__". $_ . "_index";
+      $index =~ s/,\s*/_/g;
+      "CREATE INDEX $index ON ". $self->name. " ($_)\n"
+    } $self->index->sql_list ),
   ;  
-
+  $dbh->disconnect if $created_dbh;
+  @r;
 }
 
 #
