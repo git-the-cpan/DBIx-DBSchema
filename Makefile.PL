@@ -6,5 +6,6 @@ WriteMakefile(
     'VERSION_FROM' => 'DBSchema.pm', # finds $VERSION
     'PREREQ_PM'    => {
                         'DBI' => 0,
+                        'FreezeThaw' => 0,
                       },
 );

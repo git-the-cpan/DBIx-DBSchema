@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.11  Sun Sep 28 02:16:25 2000
+        - oops, original verison got 0.10, so this one will get 0.11
+
 0.01  Sun Sep 17 07:57:35 2000
 	- original version; created by h2xs 1.19
 
