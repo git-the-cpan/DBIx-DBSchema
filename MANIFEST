@@ -1,0 +1,14 @@
+Changes
+MANIFEST
+README
+Makefile.PL
+DBSchema.pm
+test.pl
+DBSchema/Table.pm
+DBSchema/ColGroup.pm
+DBSchema/ColGroup/Index.pm
+DBSchema/ColGroup/Unique.pm
+DBSchema/Column.pm
+DBSchema/DBD.pm
+DBSchema/DBD/mysql.pm
+DBSchema/DBD/Pg.pm
