@@ -5,7 +5,7 @@ use vars qw(@ISA $VERSION);
 #use Exporter;
 use Carp qw(confess);
 use DBI;
-use FreezeThaw qw(freeze thaw cmpStr);
+use Storable;
 use DBIx::DBSchema::Table;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.23";
+$VERSION = "0.24";
 
 =head1 NAME
 
@@ -136,12 +136,23 @@ Loads a DBIx::DBSchema object from a file.
 
 sub load {
   my($proto,$file)=@_; #use $proto ?
-  open(FILE,"<$file") or die "Can't open $file: $!";
-  my($string)=join('',<FILE>); #can $string have newlines?  pry not?
-  close FILE or die "Can't close $file: $!";
-  my($self)=thaw $string;
-  #no bless needed?
+
+  my $self;
+
+  #first try Storable
+  eval { $self = Storable::retrieve($file); };
+
+  if ( $@ && $@ =~ /not.*storable/i ) { #then try FreezeThaw
+    eval "use FreezeThaw;";
+    die $@ if $@;
+    open(FILE,"<$file") or die "Can't open $file: $!";
+    my $string = join('',<FILE>);
+    close FILE or die "Can't close $file: $!";
+    ($self) = FreezeThaw::thaw($string);
+  }
+
   $self;
+
 }
 
 =item save FILENAME
@@ -151,14 +162,8 @@ Saves a DBIx::DBSchema object to a file.
 =cut
 
 sub save {
-  my($self,$file)=@_;
-  my($string)=freeze $self;
-  open(FILE,">$file") or die "Can't open $file: $!";
-  print FILE $string;
-  close FILE or die "Can't close file: $!";
-  my($check_self)=thaw $string;
-  die "Verify error: Can't freeze and thaw dbdef $self"
-    if (cmpStr($self,$check_self));
+  #my($self, $file) = @_;
+  Storable::nstore(@_);
 }
 
 =item addtable TABLE_OBJECT
@@ -268,7 +273,7 @@ sub pretty_print {
           ). " ],\n"
         #"  'index' => [ ".    " ],\n"
     } $self->tables
-  ), "}\n";
+  ). "}\n";
 }
 
 =cut
@@ -337,7 +342,7 @@ Charles Shapiro <charles.shapiro@numethods.com> and Mitchell Friedman
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Ivan Kohler
+Copyright (c) 2000-2005 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under

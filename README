@@ -1,6 +1,6 @@
 DBIx::DBSchema
 
-Copyright (c) 2000-2002 Ivan Kohler
+Copyright (c) 2000-2005 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
@@ -12,7 +12,7 @@ schema from an existing database.  You can save the schema to disk and restore
 it from different process.  Most importantly, DBIx::DBSchema can write SQL
 CREATE statements for different databases from a single source.
 
-Currently supported databases are MySQL, PostgreSQL and Sybase.
+Currently supported databases are MySQL, PostgreSQL, Oracle and Sybase.
 DBIx::DBSchema will attempt to use generic SQL syntax for other databases.
 Assistance adding support for other databases is welcomed.  See the
 DBIx::DBSchema::DBD manpage, "Driver Writer's Guide and Base Class".
@@ -39,4 +39,4 @@ A mailing list is available.  Send a blank message to
 
 Homepage: <http://www.420.am/dbix-dbschema>
 
-$Id: README,v 1.9 2002/11/29 23:03:04 ivan Exp $
+$Id: README,v 1.11 2005/03/11 10:17:53 ivan Exp $

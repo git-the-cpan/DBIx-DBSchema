@@ -8,6 +8,8 @@ DBSchema.pm
 t/load.t
 t/load-mysql.t
 t/load-pg.t
+t/load-sybase.t
+t/load-oracle.t
 DBSchema/Table.pm
 DBSchema/ColGroup.pm
 DBSchema/ColGroup/Index.pm
@@ -17,3 +19,4 @@ DBSchema/DBD.pm
 DBSchema/DBD/mysql.pm
 DBSchema/DBD/Pg.pm
 DBSchema/DBD/Sybase.pm
+DBSchema/DBD/Oracle.pm

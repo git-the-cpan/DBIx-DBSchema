@@ -7,5 +7,6 @@ WriteMakefile(
     'PREREQ_PM'    => {
                         'DBI' => 0,
                         'FreezeThaw' => 0,
+                        'Storable' => 0,
                       },
 );
