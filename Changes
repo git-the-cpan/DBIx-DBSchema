@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.22 Thu Oct 23 15:18:21 PDT 2003
+	- Pg reverse-engineering fix: varchar with no limit
+	- Pg needs (unreleased) DBD::Pg 1.30 (or deb 1.22-2... interesting)
+
 0.21 Thu Sep 19 05:04:18 PDT 2002
 	- Pg reverse-engineering fix: now sets default
 

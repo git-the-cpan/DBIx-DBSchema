@@ -4,8 +4,16 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.05';
+$VERSION = '0.07';
 @ISA = qw(DBIx::DBSchema::DBD);
+
+use DBD::Pg;
+my $pg_required_version =
+  ( -e '/etc/debian_version' && $INC{'DBD/Pg.pm'} !~ m(^/usr/local/) )
+    ? '1.22'
+    : '1.30';
+eval "use DBD::Pg $pg_required_version;";
+die $@ if length($@);
 
 %typemap = (
   'BLOB' => 'BYTEA',
@@ -57,7 +65,8 @@ END
     };
 
     my $len = '';
-    if ( $_->{attlen} == -1 && $_->{typname} ne 'text' ) {
+    if ( $_->{attlen} == -1 && $_->{atttypmod} != -1 
+         && $_->{typname} ne 'text'                  ) {
       $len = $_->{atttypmod} - 4;
       if ( $_->{typname} eq 'numeric' ) {
         $len = ($len >> 16). ','. ($len & 0xffff);

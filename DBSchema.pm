@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.21";
+$VERSION = "0.22";
 
 =head1 NAME
 
@@ -96,7 +96,9 @@ closely correspond to any non-portable column types.  Use this to import a
 schema that you wish to use with many different database engines.  Although
 primary key and (unique) index information will only be read from databases
 with DBIx::DBSchema::DBD drivers (currently MySQL and PostgreSQL), import of
-column names and attributes *should* work for any database.
+column names and attributes *should* work for any database.  Note that this
+method only uses "ODBC" column types; it does not require or use an ODBC
+driver.
 
 =cut
 
@@ -312,7 +314,7 @@ sub _load_driver {
 
   #require "DBIx/DBSchema/DBD/$driver.pm";
   #$driver;
-  eval 'require "DBIx/DBSchema/DBD/$driver.pm"' and $driver;
+  eval 'require "DBIx/DBSchema/DBD/$driver.pm"' and $driver or die $@;
 }
 
 sub _tables_from_dbh {

@@ -14,3 +14,4 @@ DBSchema/Column.pm
 DBSchema/DBD.pm
 DBSchema/DBD/mysql.pm
 DBSchema/DBD/Pg.pm
+DBSchema/DBD/Sybase.pm
