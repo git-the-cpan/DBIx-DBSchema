@@ -31,7 +31,7 @@ DBIx::DBSchema::Table - Table objects
   #new style (preferred), pass a hashref of parameters
   $table = new DBIx::DBSchema::Table (
     {
-      table       => "table_name",
+      name        => "table_name",
       primary_key => "primary_key",
       unique      => $dbix_dbschema_colgroup_unique_object,
       'index'     => $dbix_dbschema_colgroup_index_object,
@@ -58,11 +58,11 @@ DBIx::DBSchema::Table - Table objects
   $dbix_dbschema_column_object = $table->column("column");
 
   #preferred
-  @sql_statements = $table->sql_create_table $dbh;
-  @sql_statements = $table->sql_create_table $datasrc, $username, $password;
+  @sql_statements = $table->sql_create_table( $dbh );
+  @sql_statements = $table->sql_create_table( $datasrc, $username, $password );
 
   #possible problems
-  @sql_statements = $table->sql_create_table $datasrc;
+  @sql_statements = $table->sql_create_table( $datasrc );
   @sql_statements = $table->sql_create_table;
 
 =head1 DESCRIPTION
@@ -105,7 +105,7 @@ sub new {
   if ( ref($_[0]) ) {
 
     $self = shift;
-    $self->{column_order} = [ map { $_->_name } @{$self->{columns}} ];
+    $self->{column_order} = [ map { $_->name } @{$self->{columns}} ];
     $self->{columns} = { map { $_->name, $_ } @{$self->{columns}} };
 
   } else {

@@ -1,5 +1,13 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.20 Mon Mar  4 04:58:34 2002
+	- documentation updates
+	- fix Column->new when using named params
+	- fix Pg driver reverse-engineering length of numeric columns:
+	  translate 655362 to 10,2, etc.
+	- fix Pg driver reverse-engineering of text columns (don't have a
+	  length)
+
 0.19 Tue Oct 23 08:49:12 2001
 	- documentation for %typemap
 	- preliminary Sybase driver from Charles Shapiro

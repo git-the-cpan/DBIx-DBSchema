@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -41,17 +41,27 @@ sub columns {
 END
   $sth->execute or die $sth->errstr;
   map {
+
+    my $len = '';
+    if ( $_->{attlen} == -1 && $_->{typname} ne 'text' ) {
+      $len = $_->{atttypmod} - 4;
+      if ( $_->{typname} eq 'numeric' ) {
+        $len = ($len >> 16). ','. ($len & 0xffff);
+      }
+    }
+
+    my $type = $_->{'typname'};
+    $type = 'char' if $type eq 'bpchar';
+
     [
       $_->{'attname'},
-      $_->{'typname'},
+      $type,
       ! $_->{'attnotnull'},
-      ( $_->{'attlen'} == -1
-        ? $_->{'atttypmod'} - 4
-        : ''
-      ),
+      $len,
       '', #default
       ''  #local
-    ]
+    ];
+
   } @{ $sth->fetchall_arrayref({}) };
 }
 
