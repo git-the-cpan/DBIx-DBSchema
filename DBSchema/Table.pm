@@ -230,6 +230,20 @@ sub addcolumn {
   push @{$self->{'column_order'}}, $column->name;
 }
 
+=item delcolumn COLUMN_NAME
+
+Deletes this column.  Returns false if no column of this name was found to
+remove, true otherwise.
+
+=cut
+
+sub delcolumn {
+  my($self,$column) = @_;
+  return 0 unless exists $self->{'columns'}{$column};
+  delete $self->{'columns'}{$column};
+  @{$self->{'column_order'}}= grep { $_ ne $column } @{$self->{'column_order'}};  1;
+}
+
 =item name [ TABLE_NAME ]
 
 Returns or sets the table name.
@@ -360,20 +374,24 @@ sub sql_create_table {
   }
   #eofalse
 
+#should be in the DBD somehwere :/
+#  my $saved_pkey = '';
 #  if ( $driver eq 'Pg' && $self->primary_key ) {
 #    my $pcolumn = $self->column( (
 #      grep { $self->column($_)->name eq $self->primary_key } $self->columns
 #    )[0] );
-#    $pcolumn->type('serial') if lc($pcolumn->type) eq 'integer';
-##    $pcolumn->local( $pcolumn->local. ' PRIMARY KEY' );
-##    $self->primary_key('');
-#    #prolly shoudl change it back afterwords :/
+##AUTO-INCREMENT#    $pcolumn->type('serial') if lc($pcolumn->type) eq 'integer';
+#    $pcolumn->local( $pcolumn->local. ' PRIMARY KEY' );
+#    #my $saved_pkey = $self->primary_key;
+#    #$self->primary_key('');
+#    #change it back afterwords :/
 #  }
 
   my(@columns)=map { $self->column($_)->line($dbh) } $self->columns;
 
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
-    if $self->primary_key && $driver ne 'Pg';
+    #if $self->primary_key && $driver ne 'Pg';
+    if $self->primary_key;
 
   my $indexnum = 1;
 
@@ -397,6 +415,7 @@ sub sql_create_table {
                } $self->index->sql_list
     if $self->index;
 
+  #$self->primary_key($saved_pkey) if $saved_pkey;
   $dbh->disconnect if $created_dbh;
   @r;
 }

@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -37,6 +37,7 @@ sub columns {
     FROM pg_class c, pg_attribute a, pg_type t
     WHERE c.relname = '$table'
       AND a.attnum > 0 AND a.attrelid = c.oid AND a.atttypid = t.oid
+    ORDER BY a.attnum
 END
   $sth->execute or die $sth->errstr;
   map {

@@ -250,7 +250,8 @@ sub line {
 
   my @r = join(' ',
     $self->name,
-    $type. ( $self->length ? '('.$self->length.')' : '' ),
+    $type.
+      ( defined($self->length) && $self->length ? '('.$self->length.')' : '' ),
     $null,
     ( ( defined($default) && $default ne '' )
       ? 'DEFAULT '. $default
