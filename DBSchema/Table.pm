@@ -4,7 +4,7 @@ use strict;
 use vars qw(@ISA %create_params);
 #use Carp;
 #use Exporter;
-use DBIx::DBSchema::Column;
+use DBIx::DBSchema::Column 0.02;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
@@ -387,7 +387,7 @@ sub sql_create_table {
 #    #change it back afterwords :/
 #  }
 
-  my(@columns)=map { $self->column($_)->line($dbh) } $self->columns;
+  my @columns = map { $self->column($_)->line($dbh) } $self->columns;
 
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
     #if $self->primary_key && $driver ne 'Pg';

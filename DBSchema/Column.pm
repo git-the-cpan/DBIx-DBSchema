@@ -1,12 +1,14 @@
 package DBIx::DBSchema::Column;
 
 use strict;
-use vars qw(@ISA);
+use vars qw(@ISA $VERSION);
 #use Carp;
 #use Exporter;
 
 #@ISA = qw(Exporter);
 @ISA = qw();
+
+$VERSION = '0.02';
 
 =head1 NAME
 
@@ -248,22 +250,24 @@ sub line {
     $null =~ s/^NULL$//;
   }
 
-  my @r = join(' ',
+  my $r = join(' ',
     $self->name,
-    $type.
-      ( defined($self->length) && $self->length ? '('.$self->length.')' : '' ),
+    $type. ( ( defined($self->length) && $self->length )
+             ? '('.$self->length.')'
+             : ''
+           ),
     $null,
     ( ( defined($default) && $default ne '' )
       ? 'DEFAULT '. $default
       : ''
     ),
-    ( ( $driver eq 'mysql' )
+    ( ( $driver eq 'mysql' && defined($self->local) )
       ? $self->local
       : ''
     ),
   );
   $dbh->disconnect if $created_dbh;
-  @r;
+  $r;
 
 }
 

@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.18";
+$VERSION = "0.19";
 
 =head1 NAME
 
@@ -58,9 +58,10 @@ schema from an existing database.  You can save the schema to disk and restore
 it a different process.  Most importantly, DBIx::DBSchema can write SQL
 CREATE statements statements for different databases from a single source.
 
-Currently supported databases are MySQL and PostgreSQL.  DBIx::DBSchema will
-attempt to use generic SQL syntax for other databases.  Assistance adding
-support for other databases is welcomed.
+Currently supported databases are MySQL and PostgreSQL.  Sybase support is
+partially implemented.  DBIx::DBSchema will attempt to use generic SQL syntax
+for other databases.  Assistance adding support for other databases is
+welcomed.  See L<DBIx::DBSchema::DBD>, "Driver Writer's Guide and Base Class".
 
 =head1 METHODS
 
@@ -329,6 +330,9 @@ sub _tables_from_dbh {
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
 
+Charles Shapiro <charles.shapiro@numethods.com> and Mitchell Friedman
+<mitchell.friedman@numethods.com> contributed the start of a Sybase driver.
+
 =head1 COPYRIGHT
 
 Copyright (c) 2000 Ivan Kohler
@@ -351,8 +355,9 @@ qw(:sql_types) here instead of externally.
 
 L<DBIx::DBSchema::Table>, L<DBIx::DBSchema::ColGroup>,
 L<DBIx::DBSchema::ColGroup::Unique>, L<DBIx::DBSchema::ColGroup::Index>,
-L<DBIx::DBSchema::Column>, L<DBIx::DBSchema::DBD>, L<DBIx::DBSchema::mysql>,
-L<DBIx::DBSchema::Pg>, L<FS::Record>, L<DBI>
+L<DBIx::DBSchema::Column>, L<DBIx::DBSchema::DBD>,
+L<DBIx::DBSchema::DBD::mysql>, L<DBIx::DBSchema::DBD::Pg>, L<FS::Record>,
+L<DBI>
 
 =cut
 

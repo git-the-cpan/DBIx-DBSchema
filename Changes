@@ -1,5 +1,14 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.19 Tue Oct 23 08:49:12 2001
+	- documentation for %typemap
+	- preliminary Sybase driver from Charles Shapiro
+	  <charles.shapiro@numethods.com> and Mitchell J. Friedman
+	  <mitchell.friedman@numethods.com>.
+	- Fix Column::line to return a scalar as documented, not a list.
+	- Should finally eliminate the Use of uninitialized value at
+	  ... DBIx/DBSchema/Column.pm line 251
+
 0.18 Fri Aug 10 17:07:28 2001
 	- Added Table::delcolumn
 	- patch from Charles Shapiro <cshapiro@numethods.com> to add

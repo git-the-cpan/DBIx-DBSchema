@@ -69,6 +69,24 @@ L<DBIx::DBSchema::ColGroup>.
 
 =back
 
+=head1 TYPE MAPPING
+
+You can define a %typemap array for your driver to map "standard" data    
+types to database-specific types.  For example, the MySQL TIMESTAMP field
+has non-standard auto-updating semantics; the MySQL DATETIME type is 
+what other databases and the ODBC standard call TIMESTAMP, so one of the   
+entries in the MySQL %typemap is:
+
+  'TIMESTAMP' => 'DATETIME',
+
+Another example is the Pg %typemap which maps the standard types BLOB and
+LONG VARBINARY to the Pg-specific BYTEA:
+
+  'BLOB' => 'BYTEA',
+  'LONG VARBINARY' => 'BYTEA',
+
+Make sure you use all uppercase-keys.
+
 =head1 AUTHOR
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
@@ -82,8 +100,6 @@ This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
-
-%typemap needs to be documented.
 
 =head1 SEE ALSO
 
