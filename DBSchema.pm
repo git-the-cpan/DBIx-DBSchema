@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.25";
+$VERSION = "0.26";
 
 =head1 NAME
 
@@ -324,7 +324,13 @@ sub _load_driver {
 
 sub _tables_from_dbh {
   my($dbh) = @_;
-  my $sth = $dbh->table_info or die $dbh->errstr;
+  my $driver = _load_driver($dbh);
+  my $db_catalog =
+    scalar(eval "DBIx::DBSchema::DBD::$driver->default_db_catalog");
+  my $db_schema  =
+    scalar(eval "DBIx::DBSchema::DBD::$driver->default_db_schema");
+  my $sth = $dbh->table_info($db_catalog, $db_schema, '', 'TABLE')
+    or die $dbh->errstr;
   #map { $_->{TABLE_NAME} } grep { $_->{TABLE_TYPE} eq 'TABLE' }
   #  @{ $sth->fetchall_arrayref({ TABLE_NAME=>1, TABLE_TYPE=>1}) };
   map { $_->[0] } grep { $_->[1] =~ /^TABLE$/i }

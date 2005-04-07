@@ -1,5 +1,8 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.26 Thu Apr  7 01:09:53 PDT 2005
+	- ask for "public" db schema only from Pg
+
 0.25 Wed Apr  6 16:12:38 PDT 2005
 	- depend on DBD::Pg 1.32 or 1.41+ (1.40 was bunk)
 

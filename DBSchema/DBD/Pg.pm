@@ -8,7 +8,7 @@ die "DBD::Pg version 1.32 or 1.41 (or later) required--".
   if $DBD::Pg::VERSION != 1.32 && $DBD::Pg::VERSION < 1.41;
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.09';
+$VERSION = '0.10';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -33,6 +33,8 @@ $schema = new_native DBIx::DBSchema $dbh;
 This module implements a PostgreSQL-native driver for DBIx::DBSchema.
 
 =cut
+
+sub default_db_schema  { 'public'; }
 
 sub columns {
   my($proto, $dbh, $table) = @_;

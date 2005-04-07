@@ -3,7 +3,7 @@ package DBIx::DBSchema::DBD;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 =head1 NAME
 
@@ -67,6 +67,24 @@ The keys of the hashref are index names, and the values are arrayrefs which
 point a list of column names for each.  See L<perldsc/"HASHES OF LISTS"> and
 L<DBIx::DBSchema::ColGroup>.
 
+=item default_db_catalog
+
+Returns the default database catalog for the DBI table_info command.
+Inheriting from DBIx::DBSchema::DBD will provide the default empty string.
+
+=cut
+
+sub default_db_catalog { ''; }
+
+=item default_db_catalog
+
+Returns the default database schema for the DBI table_info command.
+Inheriting from DBIx::DBSchema::DBD will provide the default empty string.
+
+=cut
+
+sub default_db_schema { ''; }
+
 =back
 
 =head1 TYPE MAPPING
@@ -93,8 +111,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Ivan Kohler
-Copyright (c) 2000 Mail Abuse Prevention System LLC
+Copyright (c) 2000-2005 Ivan Kohler
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
