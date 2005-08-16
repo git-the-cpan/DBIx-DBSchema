@@ -4,11 +4,12 @@ use strict;
 use vars qw(@ISA $VERSION);
 #use Carp;
 #use Exporter;
+use DBIx::DBSchema::_util qw(_load_driver);
 
 #@ISA = qw(Exporter);
 @ISA = qw();
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 =head1 NAME
 
@@ -51,6 +52,9 @@ DBIx::DBSchema::Column - Column objects
 
   $sql_line = $column->line;
   $sql_line = $column->line($datasrc);
+
+  $sql_add_column = $column->sql_add_column;
+  $sql_add_column = $column->sql_add_column($datasrc);
 
 =head1 DESCRIPTION
 
@@ -190,6 +194,34 @@ sub local {
   }
 }
 
+=item table_obj [ TABLE_OBJ ]
+
+Returns or sets the table object (see L<DBIx::DBSchema::Table>).  Typically
+set internally when a column object is added to a table object.
+
+=cut
+
+sub table_obj {
+  my($self,$value)=@_;
+  if ( defined($value) ) {
+    $self->{'table_obj'} = $value;
+  } else {
+    $self->{'table_obj'};
+  }
+}
+
+=item table_name
+
+Returns the table name, or the empty string if this column has not yet been
+assigned to a table.
+
+=cut
+
+sub table_name {
+  my $self = shift;
+  $self->{'table_obj'} ? $self->{'table_obj'}->name : '';
+}
+
 =item line [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
 
 Returns an SQL column definition.
@@ -218,8 +250,8 @@ sub line {
     my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
     $created_dbh = 1;
   }
-  
-  my $driver = DBIx::DBSchema::_load_driver($dbh);
+  my $driver = $dbh ? _load_driver($dbh) : '';
+
   my %typemap;
   %typemap = eval "\%DBIx::DBSchema::DBD::${driver}::typemap" if $driver;
   my $type = defined( $typemap{uc($self->type)} )
@@ -271,6 +303,100 @@ sub line {
 
 }
 
+=item sql_add_column
+
+Returns a list of SQL statements to add this column.
+
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and the quoting and type mapping will be more
+reliable.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database', will use
+PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
+applicable) may also be supported in the future.
+
+=cut
+
+sub sql_add_column {
+  my($self, $dbh) = (shift, shift);
+
+  die "$self: this column is not assigned to a table"
+    unless $self->table_name;
+
+  #false laziness w/Table::sql_create_driver
+  my $created_dbh = 0;
+  unless ( ref($dbh) || ! @_ ) {
+    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
+    my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
+    $created_dbh = 1;
+  }
+
+  my $driver = $dbh ? _load_driver($dbh) : '';
+
+  #eofalse
+
+  my @after_add = ();
+
+  my $real_type = '';
+  if (  $driver eq 'Pg' && $self->type eq 'serial' ) {
+    $real_type = 'serial';
+    $self->type('int');
+
+    push @after_add, sub {
+      my($table, $column) = @_;
+
+      #needs more work for old Pg
+
+      my $nextval = "nextval('public.${table}_${column}_seq'::text)";
+
+      (
+        "ALTER TABLE $table ALTER COLUMN $column SET DEFAULT $nextval",
+        "CREATE SEQUENCE ${table}_${column}_seq",
+        "UPDATE $table SET $column = $nextval WHERE $column IS NULL",
+        #"ALTER TABLE $table ALTER $column SET NOT NULL",
+      );
+
+    };
+
+  }
+
+  my $real_null = undef;
+  if ( $driver eq 'Pg' && ! $self->null ) {
+    $real_null = $self->null;
+    $self->null('NULL');
+
+    push @after_add, sub {
+      my($table, $column) = @_;
+      "ALTER TABLE $table ALTER $column SET NOT NULL";
+    };
+
+  }
+
+  my @r = ();
+  my $table = $self->table_name;
+  my $column = $self->name;
+
+  push @r, "ALTER TABLE $table ADD COLUMN ". $self->line($dbh);
+
+  push @r, &{$_}($table, $column) foreach @after_add;
+
+  push @r, "ALTER TABLE $table ADD PRIMARY KEY ( ".
+             $self->table_obj->primary_key. " )"
+    if $self->name eq $self->table_obj->primary_key;
+
+  $self->type($real_type) if $real_type;
+  $self->null($real_null) if defined $real_null;
+
+  $dbh->disconnect if $created_dbh;
+
+  @r;
+
+}
+
 =back
 
 =head1 AUTHOR
@@ -279,16 +405,15 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Ivan Kohler
-Copyright (c) 2000 Mail Abuse Prevention System LLC
+Copyright (c) 2000-2005 Ivan Kohler
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
 
-line() has database-specific foo that probably ought to be abstracted into
-the DBIx::DBSchema:DBD:: modules.
+line() and sql_add_column() hav database-specific foo that should be abstracted
+into the DBIx::DBSchema:DBD:: modules.
 
 =head1 SEE ALSO
 

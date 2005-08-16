@@ -3,9 +3,9 @@ package DBIx::DBSchema;
 use strict;
 use vars qw(@ISA $VERSION);
 #use Exporter;
-use Carp qw(confess);
 use DBI;
 use Storable;
+use DBIx::DBSchema::_util qw(_load_driver);
 use DBIx::DBSchema::Table;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.26";
+$VERSION = "0.27";
 
 =head1 NAME
 
@@ -305,22 +305,6 @@ sub pretty_read {
 }
 
 # private subroutines
-
-sub _load_driver {
-  my($dbh) = @_;
-  my $driver;
-  if ( ref($dbh) ) {
-    $driver = $dbh->{Driver}->{Name};
-  } else {
-    $dbh =~ s/^dbi:(\w*?)(?:\((.*?)\))?://i #nicked from DBI->connect
-                        or '' =~ /()/; # ensure $1 etc are empty if match fails
-    $driver = $1 or confess "can't parse data source: $dbh";
-  }
-
-  #require "DBIx/DBSchema/DBD/$driver.pm";
-  #$driver;
-  eval 'require "DBIx/DBSchema/DBD/$driver.pm"' and $driver or die $@;
-}
 
 sub _tables_from_dbh {
   my($dbh) = @_;

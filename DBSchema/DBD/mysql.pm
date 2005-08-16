@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -37,7 +37,7 @@ sub columns {
   my $sth = $dbh->prepare("SHOW COLUMNS FROM $table") or die $dbh->errstr;
   $sth->execute or die $sth->errstr;
   map {
-    $_->{'Type'} =~ /^(\w+)\(?([\d\,]+)?\)?( unsigned)?$/
+    $_->{'Type'} =~ /^(\w+)\(?(.+)?\)?( unsigned)?$/
       or die "Illegal type: ". $_->{'Type'}. "\n";
     my($type, $length) = ($1, $2);
     [

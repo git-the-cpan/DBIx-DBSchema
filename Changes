@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.27 Mon Aug 15 23:31:54 PDT 2005
+	- MySQL patch for enum types from Andy Orr
+	- new Column::sql_add_column method!
+
 0.26 Thu Apr  7 01:09:53 PDT 2005
 	- ask for "public" db schema only from Pg
 

@@ -1,15 +1,18 @@
 package DBIx::DBSchema::Table;
 
 use strict;
-use vars qw(@ISA %create_params);
+use vars qw(@ISA $VERSION %create_params);
 #use Carp;
 #use Exporter;
-use DBIx::DBSchema::Column 0.02;
+use DBIx::DBSchema::_util qw(_load_driver);
+use DBIx::DBSchema::Column 0.03;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
 #@ISA = qw(Exporter);
 @ISA = qw();
+
+$VERSION = '0.02';
 
 =head1 NAME
 
@@ -131,6 +134,9 @@ sub new {
 
   bless ($self, $class);
 
+  $_->table_obj($self) foreach values %{ $self->{columns} };
+
+  $self;
 }
 
 =item new_odbc DATABASE_HANDLE TABLE_NAME
@@ -159,7 +165,7 @@ have to have ODBC installed or connect to the database via ODBC.
 
 sub new_odbc {
   my( $proto, $dbh, $name) = @_;
-  my $driver = DBIx::DBSchema::_load_driver($dbh);
+  my $driver = _load_driver($dbh);
   my $sth = _null_sth($dbh, $name);
   my $sthpos = 0;
   $proto->new (
@@ -205,7 +211,7 @@ engine (currently, MySQL and PostgreSQL).
 
 sub new_native {
   my( $proto, $dbh, $name) = @_;
-  my $driver = DBIx::DBSchema::_load_driver($dbh);
+  my $driver = _load_driver($dbh);
   $proto->new (
     $name,
     scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
@@ -228,8 +234,9 @@ Adds this DBIx::DBSchema::Column object.
 =cut
 
 sub addcolumn {
-  my($self,$column)=@_;
-  ${$self->{'columns'}}{$column->name}=$column; #sanity check?
+  my($self, $column) = @_;
+  $column->table_obj($self);
+  ${$self->{'columns'}}{$column->name} = $column; #sanity check?
   push @{$self->{'column_order'}}, $column->name;
 }
 
@@ -243,6 +250,7 @@ remove, true otherwise.
 sub delcolumn {
   my($self,$column) = @_;
   return 0 unless exists $self->{'columns'}{$column};
+  $self->{'columns'}{$column}->table_obj('');
   delete $self->{'columns'}{$column};
   @{$self->{'column_order'}}= grep { $_ ne $column } @{$self->{'column_order'}};  1;
 }
@@ -365,17 +373,7 @@ sub sql_create_table {
     my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
     $created_dbh = 1;
   }
-  #false laziness: nicked from DBSchema::_load_driver
-  my $driver;
-  if ( ref($dbh) ) {
-    $driver = $dbh->{Driver}->{Name};
-  } else {
-    my $discard = $dbh;
-    $discard =~ s/^dbi:(\w*?)(?:\((.*?)\))?://i #nicked from DBI->connect
-                        or '' =~ /()/; # ensure $1 etc are empty if match fails
-    $driver = $1 or die "can't parse data source: $dbh";
-  }
-  #eofalse
+  my $driver = _load_driver($dbh);
 
 #should be in the DBD somehwere :/
 #  my $saved_pkey = '';
