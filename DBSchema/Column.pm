@@ -277,7 +277,7 @@ sub line {
   if ( $driver eq 'mysql' ) { #yucky mysql hack
     $null ||= "NOT NULL";
     $self->local('AUTO_INCREMENT') if uc($self->type) eq 'SERIAL';
-  } elsif ( $driver eq 'Pg' ) { #yucky Pg hack
+  } elsif ( $driver =~ /^(?:Pg|SQLite)$/ ) { #yucky Pg/SQLite hack
     $null ||= "NOT NULL";
     $null =~ s/^NULL$//;
   }

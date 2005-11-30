@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.28 Wed Nov 30 09:46:47 PST 2005
+        - Initial SQLite support from Jesse Vincent
+	- fix typo in DBIx::DBSchema::DBD POD doc
+
 0.27 Mon Aug 15 23:31:54 PDT 2005
 	- MySQL patch for enum types from Andy Orr
 	- new Column::sql_add_column method!

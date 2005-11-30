@@ -1,7 +1,14 @@
+named indices (index representation needs an overhaul)
+
+multiple primary keys (oracle, db2, others?)
+
+better documentation for Column::sql_add_column
+
+Additional transformations (deleted, modified columns, added/modified/indices
+(probably need em named first), added/deleted tables
+
 port and test with additional databases
 
 sql CREATE TABLE output should convert integers
 (i.e. use DBI qw(:sql_types);) to local types using DBI->type_info plus a hash
 to fudge things
-
-index representation needs an overhaul.  named indices.

@@ -370,7 +370,7 @@ sub sql_create_table {
   my $created_dbh = 0;
   unless ( ref($dbh) || ! @_ ) {
     $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
-    my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
+    my $gratuitous = $DBI::errstr; #surpress superfluous 'used only once' error
     $created_dbh = 1;
   }
   my $driver = _load_driver($dbh);
@@ -391,8 +391,7 @@ sub sql_create_table {
   my @columns = map { $self->column($_)->line($dbh) } $self->columns;
 
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
-    #if $self->primary_key && $driver ne 'Pg';
-    if $self->primary_key;
+    if $self->primary_key && ! grep /PRIMARY KEY/i, @columns;
 
   my $indexnum = 1;
 

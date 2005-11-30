@@ -14,7 +14,7 @@ DBIx::DBSchema::DBD - DBIx::DBSchema Driver Writer's Guide and Base Class
   perldoc DBIx::DBSchema::DBD
 
   package DBIx::DBSchema::DBD::FooBase
-  use DBIx::DBSchmea::DBD;
+  use DBIx::DBSchema::DBD;
   @ISA = qw(DBIx::DBSchema::DBD);
 
 =head1 DESCRIPTION
