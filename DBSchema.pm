@@ -14,7 +14,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.28";
+$VERSION = "0.29";
 
 =head1 NAME
 
@@ -323,22 +323,43 @@ sub _tables_from_dbh {
 
 =back
 
-=head1 AUTHOR
+=head1 AUTHORS
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Charles Shapiro <charles.shapiro@numethods.com> and Mitchell Friedman
 <mitchell.friedman@numethods.com> contributed the start of a Sybase driver.
 
+Daniel Hanks <hanksdc@about-inc.com> contributed the Oracle driver.
+
+Jesse Vincent contributed the SQLite driver.
+
+=head1 CONTRIBUTIONS
+
+Contributions are welcome!  I'm especially keen on any interest in the first
+three items/projects below under BUGS.
+
 =head1 COPYRIGHT
 
-Copyright (c) 2000-2005 Ivan Kohler
+Copyright (c) 2000-2006 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
+
+Indices are not stored by name.  Index representation could use an overhaul.
+
+Multiple primary keys are not yet supported.
+
+Foreign keys and other constraints are not yet supported.
+
+Eventually it would be nice to have additional transformations (deleted,
+modified columns, added/modified/indices (probably need em named first),
+added/deleted tables
+
+Need to port and test with additional databases
 
 Each DBIx::DBSchema object should have a name which corresponds to its name
 within the SQL database engine (DBI data source).
@@ -347,6 +368,10 @@ pretty_print is actually pretty ugly.
 
 Perhaps pretty_read should eval column types so that we can use DBI
 qw(:sql_types) here instead of externally.
+
+sql CREATE TABLE output should convert integers
+(i.e. use DBI qw(:sql_types);) to local types using DBI->type_info plus a hash
+to fudge things
 
 =head1 SEE ALSO
 

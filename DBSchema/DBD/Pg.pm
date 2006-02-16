@@ -3,13 +3,14 @@ package DBIx::DBSchema::DBD::Pg;
 use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBD::Pg 1.32;
-die "DBD::Pg version 1.32 or 1.41 (or later) required--".
-    "this is only version $DBD::Pg::VERSION\n"
-  if $DBD::Pg::VERSION != 1.32 && $DBD::Pg::VERSION < 1.41;
 use DBIx::DBSchema::DBD;
 
 $VERSION = '0.10';
 @ISA = qw(DBIx::DBSchema::DBD);
+
+die "DBD::Pg version 1.32 or 1.41 (or later) required--".
+    "this is only version $DBD::Pg::VERSION\n"
+  if $DBD::Pg::VERSION != 1.32 && $DBD::Pg::VERSION < 1.41;
 
 %typemap = (
   'BLOB' => 'BYTEA',

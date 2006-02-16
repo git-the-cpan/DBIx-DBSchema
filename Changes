@@ -1,5 +1,13 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.29 Thu Feb 16 13:54:42 PST 2006
+	- Column::sql_add_column fix when adding primary keys to Pg 7.2.x
+	- workaround for PAUSE parsing of DBIx::DBSchema::DBD::Pg version: move
+	  DBD::Pg verison checking after $VERSION declaration, thanks Andreas!
+	- kludge: allow scalar ref default to force quoting off, to add things
+	  like functions and empty values as defaults
+	- Move TODO file to DBSchema.pm and DBS/Column.pm BUGS sections
+
 0.28 Wed Nov 30 09:46:47 PST 2005
         - Initial SQLite support from Jesse Vincent
 	- fix typo in DBIx::DBSchema::DBD POD doc

@@ -9,7 +9,7 @@ use DBIx::DBSchema::_util qw(_load_driver);
 #@ISA = qw(Exporter);
 @ISA = qw();
 
-$VERSION = '0.03';
+$VERSION = '0.05';
 
 =head1 NAME
 
@@ -25,7 +25,7 @@ DBIx::DBSchema::Column - Column objects
     'type'    => 'varchar'
     'null'    => 'NOT NULL',
     'length'  => 64,
-    'default' => '
+    'default' => '',
     'local'   => '',
   } );
 
@@ -75,6 +75,9 @@ data type.  B<null> is the nullability of the column (intrepreted using Perl's
 rules for truth, with one exception: `NOT NULL' is false).  B<length> is the
 SQL length of the column.  B<default> is the default value of the column.
 B<local> is reserved for database-specific information.
+
+Note: If you pass a scalar reference as the B<default> rather than a scalar value, it will be dereferenced and quoting will be forced off.  This can be used to pass SQL functions such as C<$now()> or explicit empty strings as C<''> as
+defaults.
 
 =cut
 
@@ -261,7 +264,7 @@ sub line {
   my $null = $self->null;
 
   my $default;
-  if ( defined($self->default) && $self->default ne ''
+  if ( defined($self->default) && !ref($self->default) && $self->default ne ''
        && ref($dbh)
        # false laziness: nicked from FS::Record::_quote
        && ( $self->default !~ /^\-?\d+(\.\d+)?$/
@@ -270,7 +273,9 @@ sub line {
   ) {
     $default = $dbh->quote($self->default);
   } else {
-    $default = $self->default;
+    warn "*** ref pointing to data: ". ${$self->default}
+      if $ref($self->default);
+    $default = ref($self->default) ? ${$self->default} : $self->default;
   }
 
   #this should be a callback into the driver
@@ -315,8 +320,8 @@ with a database handle or data source including a valid username and password -
 a DBI connection will be opened and the quoting and type mapping will be more
 reliable.
 
-If passed a DBI data source (or handle) such as `DBI:mysql:database', will use
-PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
+If passed a DBI data source (or handle) such as `DBI:Pg:dbname=database', will
+use PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
 applicable) may also be supported in the future.
 
 =cut
@@ -351,7 +356,12 @@ sub sql_add_column {
 
       #needs more work for old Pg
 
-      my $nextval = "nextval('public.${table}_${column}_seq'::text)";
+      my $nextval;
+      if ( $dbh->{'pg_server_version'} > 70300 ) {
+        $nextval = "nextval('public.${table}_${column}_seq'::text)";
+      } else {
+        $nextval = "nextval('${table}_${column}_seq'::text)";
+      }
 
       (
         "ALTER TABLE $table ALTER COLUMN $column SET DEFAULT $nextval",
@@ -369,10 +379,23 @@ sub sql_add_column {
     $real_null = $self->null;
     $self->null('NULL');
 
-    push @after_add, sub {
-      my($table, $column) = @_;
-      "ALTER TABLE $table ALTER $column SET NOT NULL";
-    };
+    if ( $dbh->{'pg_server_version'} > 70300 ) {
+
+      push @after_add, sub {
+        my($table, $column) = @_;
+        "ALTER TABLE $table ALTER $column SET NOT NULL";
+      };
+
+    } else {
+
+      push @after_add, sub {
+        my($table, $column) = @_;
+        "UPDATE pg_attribute SET attnotnull = TRUE ".
+        " WHERE attname = '$column' ".
+        " AND attrelid = ( SELECT oid FROM pg_class WHERE relname = '$table' )";
+      };
+
+    }
 
   }
 
@@ -411,6 +434,8 @@ This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
+
+Better documentation is needed for sql_add_column
 
 line() and sql_add_column() hav database-specific foo that should be abstracted
 into the DBIx::DBSchema:DBD:: modules.
