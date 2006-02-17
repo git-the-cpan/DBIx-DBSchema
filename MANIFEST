@@ -16,7 +16,6 @@ MANIFEST
 MANIFEST.SKIP
 Makefile.PL
 README
-TODO
 t/load-mysql.t
 t/load-oracle.t
 t/load-pg.t

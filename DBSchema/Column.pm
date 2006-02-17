@@ -9,7 +9,7 @@ use DBIx::DBSchema::_util qw(_load_driver);
 #@ISA = qw(Exporter);
 @ISA = qw();
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 =head1 NAME
 
@@ -273,8 +273,6 @@ sub line {
   ) {
     $default = $dbh->quote($self->default);
   } else {
-    warn "*** ref pointing to data: ". ${$self->default}
-      if $ref($self->default);
     $default = ref($self->default) ? ${$self->default} : $self->default;
   }
 

@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.30 Thu Feb 16 16:43:01 PST 2006
+	- "Too much uptime"
+	- Remove buggy debugging from Column.pm
+	- Remove removed TODO from MANIFEST
+
 0.29 Thu Feb 16 13:54:42 PST 2006
 	- Column::sql_add_column fix when adding primary keys to Pg 7.2.x
 	- workaround for PAUSE parsing of DBIx::DBSchema::DBD::Pg version: move
