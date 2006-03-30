@@ -1,5 +1,11 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.31 Thu Mar 30 05:28:20 PST 2006
+	- more schema update stuff:
+	- added Column::sql_alter_column
+	- added Table::sql_alter_table
+	- added DBSchema::sql_update_schema and DBSchema::update_schema
+
 0.30 Thu Feb 16 16:43:01 PST 2006
 	- "Too much uptime"
 	- Remove buggy debugging from Column.pm

@@ -4,7 +4,7 @@ use strict;
 use vars qw(@ISA $VERSION);
 #use Carp;
 #use Exporter;
-use DBIx::DBSchema::_util qw(_load_driver);
+use DBIx::DBSchema::_util qw(_load_driver _dbh);
 
 #@ISA = qw(Exporter);
 @ISA = qw();
@@ -245,14 +245,8 @@ for other engines (if applicable) may also be supported in the future.
 =cut
 
 sub line {
-  my($self,$dbh) = (shift, shift);
+  my($self, $dbh) = ( shift, _dbh(@_) );
 
-  my $created_dbh = 0;
-  unless ( ref($dbh) || ! @_ ) {
-    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
-    my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
-    $created_dbh = 1;
-  }
   my $driver = $dbh ? _load_driver($dbh) : '';
 
   my %typemap;
@@ -285,7 +279,7 @@ sub line {
     $null =~ s/^NULL$//;
   }
 
-  my $r = join(' ',
+  join(' ',
     $self->name,
     $type. ( ( defined($self->length) && $self->length )
              ? '('.$self->length.')'
@@ -301,14 +295,13 @@ sub line {
       : ''
     ),
   );
-  $dbh->disconnect if $created_dbh;
-  $r;
 
 }
 
-=item sql_add_column
+=item sql_add_column [ DBH ] 
 
-Returns a list of SQL statements to add this column.
+Returns a list of SQL statements to add this column to an existing table.  (To
+create a new table, see L<DBIx::DBSchema::Table/sql_create_table> instead.)
 
 The data source can be specified by passing an open DBI database handle, or by
 passing the DBI data source name, username and password.  
@@ -325,22 +318,12 @@ applicable) may also be supported in the future.
 =cut
 
 sub sql_add_column {
-  my($self, $dbh) = (shift, shift);
+  my($self, $dbh) = ( shift, _dbh(@_) );
 
   die "$self: this column is not assigned to a table"
     unless $self->table_name;
 
-  #false laziness w/Table::sql_create_driver
-  my $created_dbh = 0;
-  unless ( ref($dbh) || ! @_ ) {
-    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
-    my $gratuitous = $DBI::errstr; #surpress superfluous `used only once' error
-    $created_dbh = 1;
-  }
-
   my $driver = $dbh ? _load_driver($dbh) : '';
-
-  #eofalse
 
   my @after_add = ();
 
@@ -412,7 +395,61 @@ sub sql_add_column {
   $self->type($real_type) if $real_type;
   $self->null($real_null) if defined $real_null;
 
-  $dbh->disconnect if $created_dbh;
+  @r;
+
+}
+
+=item sql_alter_column PROTOTYPE_COLUMN  [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
+
+Returns a list of SQL statements to alter this column so that it is identical
+to the provided prototype column, also a DBIx::DBSchema::Column object.
+
+ #Optionally, the data source can be specified by passing an open DBI database
+ #handle, or by passing the DBI data source name, username and password.  
+ #
+ #If passed a DBI data source (or handle) such as `DBI:Pg:dbname=database', will
+ #use PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
+ #applicable) may also be supported in the future.
+ #
+ #If not passed a data source (or handle), or if there is no driver for the
+ #specified database, will attempt to use generic SQL syntax.
+
+
+Or should, someday.  Right now it knows how to change NOT NULL into NULL and
+vice-versa.
+
+=cut
+
+sub sql_alter_column {
+  my( $self, $new, $dbh ) = ( shift, shift, _dbh(@_) );
+
+  my $table = $self->table_name;
+  die "$self: this column is not assigned to a table"
+    unless $table;
+
+  my $name = $self->name;
+
+#  my $driver = $dbh ? _load_driver($dbh) : '';
+
+  my @r = ();
+
+  # change the name...
+
+  # change the type...
+
+  # change nullability from NOT NULL to NULL
+  if ( ! $self->null && $new->null ) {
+    push @r, "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+  }
+
+  # change nullability from NULL to NOT NULL...
+  # this one could be more complicated, need to set a DEFAULT value and update
+  # the table first...
+  if ( $self->null && ! $new->null ) {
+    push @r, "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
+  }
+
+  # change other stuff...
 
   @r;
 
@@ -426,7 +463,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000-2005 Ivan Kohler
+Copyright (c) 2000-2006 Ivan Kohler
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

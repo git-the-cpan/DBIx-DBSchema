@@ -1,0 +1,24 @@
+Source: libdbix-dbschema-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 4), perl (>= 5.8)
+Maintainer: Ivan Kohler <ivan-debian@420.am>
+Standards-Version: 3.5.1
+
+Package: libdbix-dbschema-perl
+Architecture: all
+Depends: ${perl:Depends}, libdbi-perl, libfreezethaw-perl
+Description: Database-independent schema objects
+ DBIx::DBSchema objects are collections of DBIx::DBSchema::Table objects and
+ represent a database schema.
+ .
+ This module implements an OO-interface to database schemas.  Using this
+ module, you can create a database schema with an OO Perl interface.  You can
+ read the schema from an existing database.  You can save the schema to disk
+ and restore it from a different process.  Most importantly, DBIx::DBSchema
+ can write SQL CREATE statements  for different databases from a single source.
+ .
+ Currently supported databases are MySQL, PostgreSQL, Oracle and Sybase.
+ DBIx::DBSchema will attempt to use generic SQL syntax for other databases.
+ Assistance adding support for other databases is welcomed.  See the
+ DBIx::DBSchema::DBD manpage, "Driver Writer's Guide and Base Class".

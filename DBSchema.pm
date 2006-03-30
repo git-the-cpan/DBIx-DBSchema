@@ -1,11 +1,10 @@
 package DBIx::DBSchema;
 
 use strict;
-use vars qw(@ISA $VERSION);
+use vars qw(@ISA $VERSION $DEBUG);
 #use Exporter;
-use DBI;
 use Storable;
-use DBIx::DBSchema::_util qw(_load_driver);
+use DBIx::DBSchema::_util qw(_load_driver _dbh);
 use DBIx::DBSchema::Table;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
@@ -14,7 +13,8 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.30";
+$VERSION = "0.31";
+$DEBUG = 0;
 
 =head1 NAME
 
@@ -103,8 +103,7 @@ driver.
 =cut
 
 sub new_odbc {
-  my($proto, $dbh) = (shift, shift);
-  $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr unless ref($dbh);
+  my($proto, $dbh) = ( shift, _dbh(@_) );
   $proto->new(
     map { new_odbc DBIx::DBSchema::Table $dbh, $_ } _tables_from_dbh($dbh)
   );
@@ -121,8 +120,7 @@ only available if there is a DBIx::DBSchema::DBD for the corresponding database 
 =cut
 
 sub new_native {
-  my($proto, $dbh) = (shift, shift);
-  $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr unless ref($dbh);
+  my($proto, $dbh) = (shift, _dbh(@_) );
   $proto->new(
     map { new_native DBIx::DBSchema::Table ( $dbh, $_ ) } _tables_from_dbh($dbh)
   );
@@ -221,15 +219,86 @@ specified database, will attempt to use generic SQL syntax.
 =cut
 
 sub sql {
-  my($self, $dbh) = (shift, shift);
-  my $created_dbh = 0;
-  unless ( ref($dbh) || ! @_ ) {
-    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
-    $created_dbh = 1;
+  my($self, $dbh) = ( shift, _dbh(@_) );
+  map { $self->table($_)->sql_create_table($dbh); } $self->tables;
+}
+
+=item sql_update_schema PROTOTYPE_SCHEMA [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
+
+Returns a list of SQL statements to update this schema so that it is idential
+to the provided prototype schema, also a DBIx::DBSchema object.
+
+ #Optionally, the data source can be specified by passing an open DBI database
+ #handle, or by passing the DBI data source name, username and password.  
+ #
+ #If passed a DBI data source (or handle) such as `DBI:mysql:database' or
+ #`DBI:Pg:dbname=database', will use syntax specific to that database engine.
+ #Currently supported databases are MySQL and PostgreSQL.
+ #
+ #If not passed a data source (or handle), or if there is no driver for the
+ #specified database, will attempt to use generic SQL syntax.
+
+Right now this method knows how to add new tables and alter existing tables.
+It doesn't know how to drop tables yet.
+
+See L<DBIx::DBSchema::Table/sql_alter_table>,
+L<DBIx::DBSchema::Column/sql_add_coumn> and
+L<DBIx::DBSchema::Column/sql_alter_column> for additional specifics and
+limitations.
+
+=cut
+
+#gosh, false laziness w/DBSchema::Table::sql_alter_schema
+
+sub sql_update_schema {
+  my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
+
+  my @r = ();
+
+  foreach my $table ( $new->tables ) {
+  
+    if ( $self->table($table) ) {
+  
+      warn "$table exists\n" if $DEBUG > 1;
+
+      push @r,
+        $self->table($table)->sql_alter_table( $new->table($table), $dbh );
+
+    } else {
+  
+      warn "table $table does not exist.\n" if $DEBUG;
+
+      push @r, 
+        $new->table($table)->sql_create_table( $dbh );
+  
+    }
+  
   }
-  my @r = map { $self->table($_)->sql_create_table($dbh); } $self->tables;
-  $dbh->disconnect if $created_dbh;
+
+  # should eventually drop tables not in $new
+
+  warn join("\n", @r). "\n"
+    if $DEBUG;
+
   @r;
+  
+}
+
+=item update_schema PROTOTYPE_SCHEMA, DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ]
+
+Same as sql_update_schema, except actually runs the SQL commands to update
+the schema.  Throws a fatal error if any statement fails.
+
+=cut
+
+sub update_schema {
+  my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
+
+  foreach my $statement ( $self->sql_update_schema( $new, $dbh ) ) {
+    $dbh->do( $statement )
+      or die "Error: ". $dbh->errstr. "\n executing: $statement";
+  }
+
 }
 
 =item pretty_print
@@ -372,6 +441,8 @@ qw(:sql_types) here instead of externally.
 sql CREATE TABLE output should convert integers
 (i.e. use DBI qw(:sql_types);) to local types using DBI->type_info plus a hash
 to fudge things
+
+sql_update_schema doesn't drop tables yet.
 
 =head1 SEE ALSO
 

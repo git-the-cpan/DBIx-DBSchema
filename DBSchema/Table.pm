@@ -1,10 +1,10 @@
 package DBIx::DBSchema::Table;
 
 use strict;
-use vars qw(@ISA $VERSION %create_params);
+use vars qw(@ISA $VERSION $DEBUG %create_params);
 #use Carp;
 #use Exporter;
-use DBIx::DBSchema::_util qw(_load_driver);
+use DBIx::DBSchema::_util qw(_load_driver _dbh);
 use DBIx::DBSchema::Column 0.03;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
@@ -13,6 +13,7 @@ use DBIx::DBSchema::ColGroup::Index;
 @ISA = qw();
 
 $VERSION = '0.02';
+$DEBUG = 0;
 
 =head1 NAME
 
@@ -350,6 +351,9 @@ sub column {
 
 Returns a list of SQL statments to create this table.
 
+Optionally, the data source can be specified by passing an open DBI database
+handle, or by passing the DBI data source name, username and password.  
+
 The data source can be specified by passing an open DBI database handle, or by
 passing the DBI data source name, username and password.  
 
@@ -365,14 +369,8 @@ MySQL- or PostgreSQL-specific syntax.  Non-standard syntax for other engines
 =cut
 
 sub sql_create_table { 
-  my($self, $dbh) = (shift, shift);
+  my($self, $dbh) = ( shift, _dbh(@_) );
 
-  my $created_dbh = 0;
-  unless ( ref($dbh) || ! @_ ) {
-    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
-    my $gratuitous = $DBI::errstr; #surpress superfluous 'used only once' error
-    $created_dbh = 1;
-  }
   my $driver = _load_driver($dbh);
 
 #should be in the DBD somehwere :/
@@ -416,11 +414,65 @@ sub sql_create_table {
     if $self->index;
 
   #$self->primary_key($saved_pkey) if $saved_pkey;
-  $dbh->disconnect if $created_dbh;
   @r;
 }
 
-#
+=item sql_alter_table PROTOTYPE_TABLE, [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
+
+Returns a list of SQL statements to alter this table so that it is identical
+to the provided table, also a DBIx::DBSchema::Table object.
+
+ #Optionally, the data source can be specified by passing an open DBI database
+ #handle, or by passing the DBI data source name, username and password.  
+ #
+ #If passed a DBI data source (or handle) such as `DBI:Pg:dbname=database', will
+ #use PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
+ #applicable) may also be supported in the future.
+ #
+ #If not passed a data source (or handle), or if there is no driver for the
+ #specified database, will attempt to use generic SQL syntax.
+
+=cut
+
+#gosh, false laziness w/DBSchema::sql_update_schema
+
+sub sql_alter_table {
+  my( $self, $new, $dbh ) = ( shift, shift, _dbh(@_) );
+
+  my $table = $self->name;
+
+  my @r = ();
+
+  foreach my $column ( $new->columns ) {
+
+    if ( $self->column($column) )  {
+
+      warn "  $table.$column exists\n" if $DEBUG > 2;
+
+      push @r,
+        $self->column($column)->sql_alter_column( $new->column($column), $dbh );
+
+    } else {
+  
+      warn "column $table.$column does not exist.\n" if $DEBUG;
+
+      push @r,
+        $new->column($column)->sql_add_column( $dbh );
+  
+    }
+  
+  }
+  
+  #should eventually check & create missing indices ( & delete ones not in $new)
+  
+  #should eventually drop columns not in $new
+
+  warn join("\n", @r). "\n"
+    if $DEBUG;
+
+  @r;
+
+}
 
 sub _null_sth {
   my($dbh, $table) = @_;
@@ -441,7 +493,7 @@ with no indices.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000 Ivan Kohler
+Copyright (c) 2000-2006 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
@@ -456,6 +508,8 @@ sql_create_table may change or destroy the object's data.  If you need to use
 the object after sql_create_table, make a copy beforehand.
 
 Some of the logic in new_odbc might be better abstracted into Column.pm etc.
+
+sql_alter_table ought to update indices, and drop columns not in $new
 
 =head1 SEE ALSO
 

@@ -6,9 +6,10 @@ use strict;
 use vars qw(@ISA @EXPORT_OK);
 use Exporter;
 use Carp qw(confess);
+use DBI;
 
 @ISA = qw(Exporter);
-@EXPORT_OK = qw( _load_driver );
+@EXPORT_OK = qw( _load_driver _dbh );
 
 sub _load_driver {
   my($dbh) = @_;
@@ -24,6 +25,18 @@ sub _load_driver {
   #require "DBIx/DBSchema/DBD/$driver.pm";
   #$driver;
   eval 'require "DBIx/DBSchema/DBD/$driver.pm"' and $driver or die $@;
+}
+
+#sub _dbh_or_dbi_connect_args {
+sub _dbh {
+  my($dbh) = shift;
+  my $created_dbh = 0;
+  unless ( ref($dbh) || ! @_ ) {
+    $dbh = DBI->connect( $dbh, @_ ) or die $DBI::errstr;
+    $created_dbh = 1;
+  }
+
+  ( $dbh, $created_dbh );
 }
 
 1;
