@@ -1,6 +1,6 @@
 DBIx::DBSchema
 
-Copyright (c) 2000-2005 Ivan Kohler
+Copyright (c) 2000-2006 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
@@ -9,13 +9,15 @@ the same terms as Perl itself.
 This module implements an OO-interface to database schemas.  Using this module,
 you can create a database schema with an OO Perl interface.  You can read the
 schema from an existing database.  You can save the schema to disk and restore
-it from different process.  Most importantly, DBIx::DBSchema can write SQL
-CREATE statements for different databases from a single source.
+it from different process.  You can write SQL CREATE statements statements for
+different databases from a single source.  In recent versions, you can
+transform one schema to another, adding any necessary new columsn and tables.
 
-Currently supported databases are MySQL, PostgreSQL, Oracle, Sybase and SQLite.
-DBIx::DBSchema will attempt to use generic SQL syntax for other databases.
-Assistance adding support for other databases is welcomed.  See the
-DBIx::DBSchema::DBD manpage, "Driver Writer's Guide and Base Class".
+Currently supported databases are MySQL, PostgreSQL, and SQLite.  Sybase and
+Oracle drivers are partially implemented.  DBIx::DBSchema will attempt to use
+generic SQL syntax for other databases.  Assistance adding support for other
+databases is welcomed.  See the DBIx::DBSchema::DBD manpage, "Driver Writer's
+Guide and Base Class".
 
 To install:
 	perl Makefile.PL
@@ -39,4 +41,3 @@ A mailing list is available.  Send a blank message to
 
 Homepage: <http://www.420.am/dbix-dbschema>
 
-$Id: README,v 1.12 2006/02/16 14:19:51 ivan Exp $

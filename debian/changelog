@@ -1,3 +1,10 @@
+libdbix-dbschema-perl (0.32-1) unstable; urgency=low
+
+  * new upstream release
+    + patch from Niko Tyni to fix manpage build problems (closes: Bug#342490)
+
+ -- Ivan Kohler <ivan-debian@420.am>  Wed, 18 Apr 2007 15:06:54 -0700
+
 libdbix-dbschema-perl (0.31-1) unstable; urgency=low
 
   * new upstream release

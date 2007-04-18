@@ -187,7 +187,7 @@ while ( my $row = $sth->fetchrow_hashref ) {
 
 }
 
-=begin pod
+=pod
 
 =back
 

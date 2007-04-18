@@ -1,5 +1,18 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.32 Wed Apr 18 15:02:25 PDT 2007
+	- increment the version numbers in Column.pm and Table.pm and the
+	  "use" statements accordingly
+	- Error reporting for load constructor
+	- Update documentation wrt supported databases and new update_schema
+	  stuff
+	- Fixes for dropping nullability on old Pg (<= 7.2)
+        - Fixes for adding nullability on old Pg (<= 7.3)
+        - Throw a warning if pg_server_version is unavailable, assume >= 7.3
+        - fix POD error in DBSchema::DBD::SQLite that confused pod2man and
+          prevented the documentation from being installed.  Patch from Niko
+          Tyni <ntyni@iki.fi>, thanks!
+
 0.31 Thu Mar 30 05:28:20 PST 2006
 	- more schema update stuff:
 	- added Column::sql_alter_column

@@ -1,11 +1,11 @@
 package DBIx::DBSchema;
 
 use strict;
-use vars qw(@ISA $VERSION $DEBUG);
+use vars qw(@ISA $VERSION $DEBUG $errstr);
 #use Exporter;
 use Storable;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
-use DBIx::DBSchema::Table;
+use DBIx::DBSchema::Table 0.03;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
@@ -13,7 +13,7 @@ use DBIx::DBSchema::ColGroup::Index;
 #@ISA = qw(Exporter);
 @ISA = ();
 
-$VERSION = "0.31";
+$VERSION = "0.32";
 $DEBUG = 0;
 
 =head1 NAME
@@ -31,7 +31,7 @@ DBIx::DBSchema - Database-independent schema objects
   $schema = new_native DBIx::DBSchema $dsn, $user, $pass;
 
   $schema->save("filename");
-  $schema = load DBIx::DBSchema "filename";
+  $schema = load DBIx::DBSchema "filename" or die $DBIx::DBSchema::errstr;
 
   $schema->addtable($dbix_dbschema_table_object);
 
@@ -55,13 +55,15 @@ represent a database schema.
 This module implements an OO-interface to database schemas.  Using this module,
 you can create a database schema with an OO Perl interface.  You can read the
 schema from an existing database.  You can save the schema to disk and restore
-it a different process.  Most importantly, DBIx::DBSchema can write SQL
-CREATE statements statements for different databases from a single source.
+it a different process.  You can write SQL CREATE statements statements for
+different databases from a single source.  In recent versions, you can
+transform one schema to another, adding any necessary new columsn and tables.
 
-Currently supported databases are MySQL and PostgreSQL.  Sybase support is
-partially implemented.  DBIx::DBSchema will attempt to use generic SQL syntax
-for other databases.  Assistance adding support for other databases is
-welcomed.  See L<DBIx::DBSchema::DBD>, "Driver Writer's Guide and Base Class".
+Currently supported databases are MySQL, PostgreSQL and SQLite.  Sybase and
+Oracle drivers are partially implemented.  DBIx::DBSchema will attempt to use
+generic SQL syntax for other databases.  Assistance adding support for other
+databases is welcomed.  See L<DBIx::DBSchema::DBD>, "Driver Writer's Guide and
+Base Class".
 
 =head1 METHODS
 
@@ -128,7 +130,8 @@ sub new_native {
 
 =item load FILENAME
 
-Loads a DBIx::DBSchema object from a file.
+Loads a DBIx::DBSchema object from a file.  If there is an error, returns
+false and puts an error message in $DBIx::DBSchema::errstr;
 
 =cut
 
@@ -141,12 +144,23 @@ sub load {
   eval { $self = Storable::retrieve($file); };
 
   if ( $@ && $@ =~ /not.*storable/i ) { #then try FreezeThaw
+    my $olderror = $@;
+
     eval "use FreezeThaw;";
-    die $@ if $@;
-    open(FILE,"<$file") or die "Can't open $file: $!";
-    my $string = join('',<FILE>);
-    close FILE or die "Can't close $file: $!";
-    ($self) = FreezeThaw::thaw($string);
+    if ( $@ ) {
+      $@ = $olderror;
+    } else { 
+      open(FILE,"<$file")
+        or do { $errstr = "Can't open $file: $!"; return ''; };
+      my $string = join('',<FILE>);
+      close FILE
+        or do { $errstr = "Can't close $file: $!"; return ''; };
+      ($self) = FreezeThaw::thaw($string);
+    }
+  }
+
+  unless ( $self ) {
+    $errstr = $@;
   }
 
   $self;

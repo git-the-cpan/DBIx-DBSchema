@@ -9,7 +9,7 @@ use DBIx::DBSchema::_util qw(_load_driver _dbh);
 #@ISA = qw(Exporter);
 @ISA = qw();
 
-$VERSION = '0.06';
+$VERSION = '0.08';
 
 =head1 NAME
 
@@ -335,10 +335,16 @@ sub sql_add_column {
     push @after_add, sub {
       my($table, $column) = @_;
 
-      #needs more work for old Pg
+      #needs more work for old Pg?
+      
+      my $pg_server_version = $dbh->{'pg_server_version'};
+      unless ( $pg_server_version =~ /\d/ ) {
+        warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
+        $pg_server_version = 70300;
+      }
 
       my $nextval;
-      if ( $dbh->{'pg_server_version'} > 70300 ) {
+      if ( $pg_server_version >= 70300 ) {
         $nextval = "nextval('public.${table}_${column}_seq'::text)";
       } else {
         $nextval = "nextval('${table}_${column}_seq'::text)";
@@ -360,7 +366,14 @@ sub sql_add_column {
     $real_null = $self->null;
     $self->null('NULL');
 
-    if ( $dbh->{'pg_server_version'} > 70300 ) {
+    my $pg_server_version = $dbh->{'pg_server_version'};
+    unless ( $pg_server_version =~ /\d/ ) {
+      warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
+      $pg_server_version = 70300;
+    }
+
+    if ( $pg_server_version >= 70300 ) { #this did work on 7.3
+    #if ( $pg_server_version > 70400 ) {
 
       push @after_add, sub {
         my($table, $column) = @_;
@@ -429,7 +442,7 @@ sub sql_alter_column {
 
   my $name = $self->name;
 
-#  my $driver = $dbh ? _load_driver($dbh) : '';
+  my $driver = $dbh ? _load_driver($dbh) : '';
 
   my @r = ();
 
@@ -439,14 +452,58 @@ sub sql_alter_column {
 
   # change nullability from NOT NULL to NULL
   if ( ! $self->null && $new->null ) {
-    push @r, "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+
+    my $alter = "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+
+    if ( $driver eq 'Pg' ) {
+
+      my $pg_server_version = $dbh->{'pg_server_version'};
+      unless ( $pg_server_version =~ /\d/ ) {
+        warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
+        $pg_server_version = 70300;
+      }
+
+      if ( $pg_server_version < 70300 ) {
+        $alter = "UPDATE pg_attribute SET attnotnull = FALSE
+                    WHERE attname = '$name'
+                      AND attrelid = ( SELECT oid FROM pg_class
+                                         WHERE relname = '$table'
+                                     )";
+      }
+
+    }
+
+    push @r, $alter;
+
   }
 
   # change nullability from NULL to NOT NULL...
   # this one could be more complicated, need to set a DEFAULT value and update
   # the table first...
   if ( $self->null && ! $new->null ) {
-    push @r, "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
+
+    my $alter = "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
+
+    if ( $driver eq 'Pg' ) {
+
+      my $pg_server_version = $dbh->{'pg_server_version'};
+      unless ( $pg_server_version =~ /\d/ ) {
+        warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
+        $pg_server_version = 70300;
+      }
+
+      if ( $pg_server_version < 70300 ) {
+        push @r, "UPDATE pg_attribute SET attnotnull = TRUE
+                    WHERE attname = '$name'
+                      AND attrelid = ( SELECT oid FROM pg_class
+                                         WHERE relname = '$table'
+                                     )";
+      }
+
+    }
+
+    push @r, $alter;
+  
   }
 
   # change other stuff...

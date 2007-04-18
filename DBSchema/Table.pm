@@ -5,14 +5,14 @@ use vars qw(@ISA $VERSION $DEBUG %create_params);
 #use Carp;
 #use Exporter;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
-use DBIx::DBSchema::Column 0.03;
+use DBIx::DBSchema::Column 0.07;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
 #@ISA = qw(Exporter);
 @ISA = qw();
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 $DEBUG = 0;
 
 =head1 NAME
