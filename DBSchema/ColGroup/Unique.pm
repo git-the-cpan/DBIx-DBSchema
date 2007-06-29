@@ -18,13 +18,13 @@ DBIx::DBSchema::ColGroup::Unique - Unique column group object
 
 =head1 DESCRIPTION
 
+This class is deprecated and included for backwards-compatibility only.
+See L<DBIx::DBSchema::Index> for the current class used to store unique
+and non-unique indices.
+
 DBIx::DBSchema::ColGroup::Unique objects represent the unique indices of a
 database table (L<DBIx::DBSchema::Table>).  DBIx::DBSchema::ColGroup:Unique
 inherits from DBIx::DBSchema::ColGroup.
-
-=head1 BUGS
-
-Is this empty subclass needed?
 
 =head1 SEE ALSO
 

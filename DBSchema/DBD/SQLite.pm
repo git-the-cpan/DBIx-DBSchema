@@ -4,11 +4,11 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
-'SERIAL' => 'INTEGER PRIMARY KEY'
+  'SERIAL' => 'INTEGER PRIMARY KEY AUTOINCREMENT',
 );
 
 =head1 NAME

@@ -1,3 +1,9 @@
+libdbix-dbschema-perl (0.33-1) unstable; urgency=low
+
+  * new upstream release
+
+ -- Ivan Kohler <ivan-debian@420.am>  Wed, 27 Jun 2007 19:08:10 -0700
+
 libdbix-dbschema-perl (0.32-1) unstable; urgency=low
 
   * new upstream release

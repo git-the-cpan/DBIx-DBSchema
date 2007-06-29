@@ -1,19 +1,18 @@
 package DBIx::DBSchema;
 
 use strict;
-use vars qw(@ISA $VERSION $DEBUG $errstr);
-#use Exporter;
+use vars qw($VERSION $DEBUG $errstr);
 use Storable;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
-use DBIx::DBSchema::Table 0.03;
+use DBIx::DBSchema::Table 0.04;
+use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-#@ISA = qw(Exporter);
-@ISA = ();
+$VERSION = "0.33";
+#$VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
-$VERSION = "0.32";
 $DEBUG = 0;
 
 =head1 NAME
@@ -55,9 +54,10 @@ represent a database schema.
 This module implements an OO-interface to database schemas.  Using this module,
 you can create a database schema with an OO Perl interface.  You can read the
 schema from an existing database.  You can save the schema to disk and restore
-it a different process.  You can write SQL CREATE statements statements for
+it in a different process.  You can write SQL CREATE statements statements for
 different databases from a single source.  In recent versions, you can
-transform one schema to another, adding any necessary new columsn and tables.
+transform one schema to another, adding any necessary new columns and tables
+(and, as of 0.33, indices).
 
 Currently supported databases are MySQL, PostgreSQL and SQLite.  Sybase and
 Oracle drivers are partially implemented.  DBIx::DBSchema will attempt to use
@@ -292,7 +292,7 @@ sub sql_update_schema {
   # should eventually drop tables not in $new
 
   warn join("\n", @r). "\n"
-    if $DEBUG;
+    if $DEBUG > 1;
 
   @r;
   
@@ -324,37 +324,72 @@ hash.
 
 sub pretty_print {
   my($self) = @_;
+
   join("},\n\n",
     map {
-      my $table = $_;
-      "'$table' => {\n".
+      my $tablename = $_;
+      my $table = $self->table($tablename);
+      my %indices = $table->indices;
+
+      "'$tablename' => {\n".
         "  'columns' => [\n".
           join("", map { 
                          #cant because -w complains about , in qw()
                          # (also biiiig problems with empty lengths)
                          #"    qw( $_ ".
-                         #$self->table($table)->column($_)->type. " ".
-                         #( $self->table($table)->column($_)->null ? 'NULL' : 0 ). " ".
-                         #$self->table($table)->column($_)->length. " ),\n"
+                         #$table->column($_)->type. " ".
+                         #( $table->column($_)->null ? 'NULL' : 0 ). " ".
+                         #$table->column($_)->length. " ),\n"
                          "    '$_', ".
-                         "'". $self->table($table)->column($_)->type. "', ".
-                         "'". $self->table($table)->column($_)->null. "', ". 
-                         "'". $self->table($table)->column($_)->length. "', ".
-                         "'". $self->table($table)->column($_)->default. "', ".
-                         "'". $self->table($table)->column($_)->local. "',\n"
-                       } $self->table($table)->columns
+                         "'". $table->column($_)->type. "', ".
+                         "'". $table->column($_)->null. "', ". 
+                         "'". $table->column($_)->length. "', ".
+                         "'". $table->column($_)->default. "', ".
+                         "'". $table->column($_)->local. "',\n"
+                       } $table->columns
           ).
         "  ],\n".
-        "  'primary_key' => '". $self->table($table)->primary_key. "',\n".
-        "  'unique' => [ ". join(', ',
-          map { "[ '". join("', '", @{$_}). "' ]" }
-            @{$self->table($table)->unique->lol_ref}
-          ).  " ],\n".
-        "  'index' => [ ". join(', ',
-          map { "[ '". join("', '", @{$_}). "' ]" }
-            @{$self->table($table)->index->lol_ref}
-          ). " ],\n"
-        #"  'index' => [ ".    " ],\n"
+        "  'primary_key' => '". $table->primary_key. "',\n".
+
+        #old style index representation..
+
+        ( 
+          $table->{'unique'} # $table->unique
+            ? "  'unique' => [ ". join(', ',
+                map { "[ '". join("', '", @{$_}). "' ]" }
+                    @{$table->unique->lol_ref}
+              ).  " ],\n"
+            : ''
+        ).
+
+        ( $table->{'index'} # $table->index
+            ? "  'index' => [ ". join(', ',
+                map { "[ '". join("', '", @{$_}). "' ]" }
+                    @{$table->index->lol_ref}
+              ). " ],\n"
+            : ''
+        ).
+
+        #new style indices
+        "  'indices' => { ". join( ",\n                 ",
+
+          map { my $iname = $_;
+                my $index = $indices{$iname};
+                "'$iname' => { \n".
+                  ( $index->using
+                      ? "              'using'  => '". $index->using ."',\n"
+                      : ''
+                  ).
+                  "                   'unique'  => ". $index->unique .",\n".
+                  "                   'columns' => [ '".
+                                              join("', '", @{$index->columns} ).
+                                              "' ],\n".
+                "                 },\n";
+              }
+              keys %indices
+
+        ). "\n               }, \n"
+
     } $self->tables
   ). "}\n";
 }
@@ -370,21 +405,43 @@ B<pretty_print> method.
 
 sub pretty_read {
   my($proto, $href) = @_;
+
   my $schema = $proto->new( map {  
-    my(@columns);
-    while ( @{$href->{$_}{'columns'}} ) {
+
+    my $tablename = $_;
+    my $info = $href->{$tablename};
+
+    my @columns;
+    while ( @{$info->{'columns'}} ) {
       push @columns, DBIx::DBSchema::Column->new(
-        splice @{$href->{$_}{'columns'}}, 0, 6
+        splice @{$info->{'columns'}}, 0, 6
       );
     }
-    DBIx::DBSchema::Table->new(
-      $_,
-      $href->{$_}{'primary_key'},
-      DBIx::DBSchema::ColGroup::Unique->new($href->{$_}{'unique'}),
-      DBIx::DBSchema::ColGroup::Index->new($href->{$_}{'index'}),
-      @columns,
-    );
+
+    DBIx::DBSchema::Table->new({
+      'name'        => $tablename,
+      'primary_key' => $info->{'primary_key'},
+      'columns'     => \@columns,
+
+      #old-style indices 
+      'unique'      => DBIx::DBSchema::ColGroup::Unique->new($info->{'unique'}),
+      'index'       => DBIx::DBSchema::ColGroup::Index->new($info->{'index'}),
+
+      #new-style indices
+      'indices'     => [ map { my $idx_info = $info->{'indices'}{$_};
+                               DBIx::DBSchema::Index->new({
+                                 'name'    => $_,
+                                 #'using'   =>
+                                 'unique'  => $idx_info->{'unique'},
+                                 'columns' => $idx_info->{'columns'},
+                               });
+                             }
+                             keys %{ $info->{'indices'} }
+                       ],
+    } );
+
   } (keys %{$href}) );
+
 }
 
 # private subroutines
@@ -419,28 +476,27 @@ Jesse Vincent contributed the SQLite driver.
 
 =head1 CONTRIBUTIONS
 
-Contributions are welcome!  I'm especially keen on any interest in the first
-three items/projects below under BUGS.
+Contributions are welcome!  I'm especially keen on any interest in the top
+items/projects below under BUGS.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000-2006 Ivan Kohler
+Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
+Copyright (c) 2007 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
-=head1 BUGS
-
-Indices are not stored by name.  Index representation could use an overhaul.
+=head1 BUGS AND TODO
 
 Multiple primary keys are not yet supported.
 
 Foreign keys and other constraints are not yet supported.
 
 Eventually it would be nice to have additional transformations (deleted,
-modified columns, added/modified/indices (probably need em named first),
-added/deleted tables
+modified columns, deleted tables).  sql_update_schema doesn't drop tables
+or deal with deleted or modified columns yet.
 
 Need to port and test with additional databases
 
@@ -449,19 +505,30 @@ within the SQL database engine (DBI data source).
 
 pretty_print is actually pretty ugly.
 
+pretty_print isn't so good about quoting values...  save/load is a much better
+alternative to using pretty_print/pretty_read
+
+pretty_read is pretty ugly too.
+
+pretty_read should *not* create and pass in old-style unique/index indices
+when nothing is given in the read.
+
 Perhaps pretty_read should eval column types so that we can use DBI
 qw(:sql_types) here instead of externally.
+
+Need to support "using" index attribute in pretty_read and in reverse
+engineering
+
+perhaps we should just get rid of pretty_read entirely.  pretty_print is useful
+for debugging, but pretty_read is pretty bunk.
 
 sql CREATE TABLE output should convert integers
 (i.e. use DBI qw(:sql_types);) to local types using DBI->type_info plus a hash
 to fudge things
 
-sql_update_schema doesn't drop tables yet.
-
 =head1 SEE ALSO
 
-L<DBIx::DBSchema::Table>, L<DBIx::DBSchema::ColGroup>,
-L<DBIx::DBSchema::ColGroup::Unique>, L<DBIx::DBSchema::ColGroup::Index>,
+L<DBIx::DBSchema::Table>, L<DBIx::DBSchema::Index>,
 L<DBIx::DBSchema::Column>, L<DBIx::DBSchema::DBD>,
 L<DBIx::DBSchema::DBD::mysql>, L<DBIx::DBSchema::DBD::Pg>, L<FS::Record>,
 L<DBI>

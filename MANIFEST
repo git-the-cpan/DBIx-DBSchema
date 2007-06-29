@@ -10,6 +10,7 @@ DBSchema/DBD/Pg.pm
 DBSchema/DBD/SQLite.pm
 DBSchema/DBD/Sybase.pm
 DBSchema/DBD/mysql.pm
+DBSchema/Index.pm
 DBSchema/Table.pm
 DBSchema/_util.pm
 MANIFEST

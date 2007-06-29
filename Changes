@@ -1,5 +1,23 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.33 Thu Jun 28 18:46:15 PDT 2007
+        - Overhaul of index representation: indices (both normal and unique)
+          now have names and are DBIx::DBSchema::Index objects
+        - update_schema now handles indices!
+        - Bump version numbers in Table.pm, Column.pm and DBD.pm
+        - Pg reverse-engineering fix for column order in multi-column indices,
+          to prevent needless drop/add of identical indices
+        - mysql reverse-engineering patch from Brian Phillips
+          <bphillips@cpan.org>, closes: CPAN#17582, thanks!
+        - mysql NAME vs NAME_lc patch from Ralf Hack <ralf@beetlecraft.net>,
+          closes: CPAN#16715, thanks!
+        - mysql fix for additional column data from Chris Mungall
+          <cjm@fruitfly.org>, closes: CPAN#20859, thanks!
+        - SQLite SERIAL patch from IN SUK JOUNG <i.joung@gmail.com>, and fix
+          for mis-application of said patch from Slaven Rezic
+          <srezic@cpan.org>, thanks!
+        - Update README wrt current CVS info and URL, closes: CPAN#27577
+
 0.32 Wed Apr 18 15:02:25 PDT 2007
 	- increment the version numbers in Column.pm and Table.pm and the
 	  "use" statements accordingly

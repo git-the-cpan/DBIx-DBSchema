@@ -5,7 +5,7 @@ use vars qw($VERSION @ISA %typemap);
 use DBD::Pg 1.32;
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.10';
+$VERSION = '0.11';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 die "DBD::Pg version 1.32 or 1.41 (or later) required--".
@@ -136,6 +136,7 @@ sub _index_fields {
     FROM pg_class c, pg_attribute a, pg_type t
     WHERE c.relname = '$index'
       AND a.attnum > 0 AND a.attrelid = c.oid AND a.atttypid = t.oid
+    ORDER BY a.attnum
 END
   $sth->execute or die $sth->errstr;
   map { $_->{'attname'} } @{ $sth->fetchall_arrayref({}) };

@@ -18,13 +18,13 @@ DBIx::DBSchema::ColGroup::Index - Index column group object
 
 =head1 DESCRIPTION
 
+This class is deprecated and included for backwards-compatibility only.
+See L<DBIx::DBSchema::Index> for the current class used to store unique
+and non-unique indices.
+
 DBIx::DBSchema::ColGroup::Index objects represent the (non-unique) indices of a
 database table (L<DBIx::DBSchema::Table>).  DBIx::DBSchema::ColGroup::Index
 inherits from DBIx::DBSchema::ColGroup.
-
-=head1 BUGS
-
-Is this empty subclass needed?
 
 =head1 SEE ALSO
 

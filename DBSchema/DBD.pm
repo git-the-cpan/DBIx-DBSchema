@@ -3,7 +3,7 @@ package DBIx::DBSchema::DBD;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 =head1 NAME
 
@@ -55,17 +55,84 @@ table.
 
 =item unique CLASS DBI_DBH TABLE
 
+Deprecated method - see the B<indices> method for new drivers.
+
 Given an active DBI database handle, return a hashref of unique indices.  The
 keys of the hashref are index names, and the values are arrayrefs which point
 a list of column names for each.  See L<perldsc/"HASHES OF LISTS"> and
-L<DBIx::DBSchema::ColGroup>.
+L<DBIx::DBSchema::Index>.
 
 =item index CLASS DBI_DBH TABLE
+
+Deprecated method - see the B<indices> method for new drivers.
 
 Given an active DBI database handle, return a hashref of (non-unique) indices.
 The keys of the hashref are index names, and the values are arrayrefs which
 point a list of column names for each.  See L<perldsc/"HASHES OF LISTS"> and
-L<DBIx::DBSchema::ColGroup>.
+L<DBIx::DBSchema::Index>.
+
+=item indices CLASS DBI_DBH TABLE
+
+Given an active DBI database handle, return a hashref of all indices, both
+unique and non-unique.  The keys of the hashref are index names, and the values
+are again hashrefs with the following keys:
+
+=over 8
+
+=item name - Index name (redundant)
+
+=item using - Optional index method
+
+=item unique - Boolean indicating whether or not this is a unique index
+
+=item columns - List reference of column names (or expressions)
+
+=back
+
+(See L<FS::DBIx::DBSchema::Index>)
+
+New drivers are advised to implement this method, and existing drivers are
+advised to (eventually) provide this method instead of B<index> and B<unique>.
+
+For backwards-compatibility with current drivers, the base DBIx::DBSchema::DBD
+class provides an B<indices> method which uses the old B<index> and B<unique>
+methods to provide this data.
+
+=cut
+
+sub indices {
+  #my($proto, $dbh, $table) = @_;
+  my($proto, @param) = @_;
+
+  my $unique_hr = $proto->unique( @param );
+  my $index_hr  = $proto->index(  @param );
+
+  my $gratuitous_hashref_to_force_scalar_context =
+  {
+
+    (
+      map {
+            $_ => { 'name'    => $_,
+                    'unique'  => 1,
+                    'columns' => $unique_hr->{$_},
+                  },
+          }
+          keys %$unique_hr
+    ),
+
+    (
+      map {
+            $_ => { 'name'    => $_,
+                    'unique'  => 0,
+                    'columns' => $index_hr->{$_},
+                  },
+          }
+          keys %$index_hr
+    ),
+
+  };
+
+}
 
 =item default_db_catalog
 
@@ -121,7 +188,7 @@ the same terms as Perl itself.
 =head1 SEE ALSO
 
 L<DBIx::DBSchema>, L<DBIx::DBSchema::DBD::mysql>, L<DBIx::DBSchema::DBD::Pg>,
-L<DBIx::DBSchema::ColGroup>, L<DBI>, L<DBI::DBD>, L<perllol>,
+L<DBIx::DBSchema::Index>, L<DBI>, L<DBI::DBD>, L<perllol>,
 L<perldsc/"HASHES OF LISTS">
 
 =cut 

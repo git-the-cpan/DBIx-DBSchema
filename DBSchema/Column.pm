@@ -1,15 +1,11 @@
 package DBIx::DBSchema::Column;
 
 use strict;
-use vars qw(@ISA $VERSION);
-#use Carp;
-#use Exporter;
+use vars qw($VERSION);
+use Carp;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
 
-#@ISA = qw(Exporter);
-@ISA = qw();
-
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 =head1 NAME
 
@@ -89,6 +85,10 @@ sub new {
   if ( ref($_[0]) ) {
     $self = shift;
   } else {
+    #carp "Old-style $class creation without named parameters is deprecated!";
+    #croak "FATAL: old-style $class creation no longer supported;".
+    #      " use named parameters";
+
     $self = { map { $_ => shift } qw(name type null length default local) };
   }
 
@@ -526,6 +526,9 @@ This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
+
+The new() method should warn that 
+"Old-style $class creation without named parameters is deprecated!"
 
 Better documentation is needed for sql_add_column
 

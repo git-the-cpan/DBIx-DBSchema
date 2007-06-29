@@ -1,11 +1,7 @@
 package DBIx::DBSchema::ColGroup;
 
 use strict;
-use vars qw(@ISA);
-#use Exporter;
-
-#@ISA = qw(Exporter);
-@ISA = qw();
+use Carp;
 
 =head1 NAME
 
@@ -32,6 +28,10 @@ DBIx::DBSchema::ColGroup - Column group objects
 
 =head1 DESCRIPTION
 
+This class is deprecated and included for backwards-compatibility only.
+See L<DBIx::DBSchema::Index> for the current class used to store unique
+and non-unique indices.
+
 DBIx::DBSchema::ColGroup objects represent sets of sets of columns.  (IOW a
 "list of lists" - see L<perllol>.)
 
@@ -50,6 +50,9 @@ sub new {
   my($proto, $lol) = @_;
 
   my $class = ref($proto) || $proto;
+
+  carp "WARNING: $proto is deprecated; switch to DBIx::DBSchema::Index";
+
   my $self = {
     'lol' => $lol,
   };
@@ -131,9 +134,9 @@ the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-L<DBIx::DBSchema::Table>, L<DBIx::DBSchema::ColGroup::Unique>,
-L<DBIx::DBSchema::ColGroup::Index>, L<DBIx::DBSchema>, L<perllol>, L<perldsc>,
-L<DBI>
+L<DBIx::DBSchema::Index>, L<DBIx::DBSchema::Table>,
+L<DBIx::DBSchema::ColGroup::Unique>, L<DBIx::DBSchema::ColGroup::Index>,
+L<DBIx::DBSchema>, L<perllol>, L<perldsc>, L<DBI>
 
 =cut
 

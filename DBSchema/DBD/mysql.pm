@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -34,10 +34,12 @@ This module implements a MySQL-native driver for DBIx::DBSchema.
 
 sub columns {
   my($proto, $dbh, $table ) = @_;
+  my $oldkhv=$dbh->{FetchHashKeyName};
+  $dbh->{FetchHashKeyName}="NAME";
   my $sth = $dbh->prepare("SHOW COLUMNS FROM $table") or die $dbh->errstr;
   $sth->execute or die $sth->errstr;
-  map {
-    $_->{'Type'} =~ /^(\w+)\(?(.+)?\)?( unsigned)?$/
+  my @r = map {
+    $_->{'Type'} =~ /^(\w+)\(?([^)]+)?\)?( \d+)?$/
       or die "Illegal type: ". $_->{'Type'}. "\n";
     my($type, $length) = ($1, $2);
     [
@@ -49,6 +51,8 @@ sub columns {
       $_->{'Extra'}
     ]
   } @{ $sth->fetchall_arrayref( {} ) };
+  $dbh->{FetchHashKeyName}=$oldkhv;
+  @r;
 }
 
 #sub primary_key {
@@ -83,6 +87,8 @@ sub index {
 
 sub _show_index {
   my($proto, $dbh, $table ) = @_;
+  my $oldkhv=$dbh->{FetchHashKeyName};
+  $dbh->{FetchHashKeyName}="NAME";
   my $sth = $dbh->prepare("SHOW INDEX FROM $table")
     or die $dbh->errstr;
   $sth->execute or die $sth->errstr;
@@ -98,6 +104,7 @@ sub _show_index {
       push @{ $unique{ $row->{'Key_name'} } }, $row->{'Column_name'};
     }
   }
+  $dbh->{FetchHashKeyName}=$oldkhv;
 
   ( $pkey, \%unique, \%index );
 }

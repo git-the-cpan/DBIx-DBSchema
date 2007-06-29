@@ -1,18 +1,16 @@
 package DBIx::DBSchema::Table;
 
 use strict;
-use vars qw(@ISA $VERSION $DEBUG %create_params);
-#use Carp;
+use vars qw($VERSION $DEBUG %create_params);
+use Carp;
 #use Exporter;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
 use DBIx::DBSchema::Column 0.07;
+use DBIx::DBSchema::Index;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-#@ISA = qw(Exporter);
-@ISA = qw();
-
-$VERSION = '0.03';
+$VERSION = '0.04';
 $DEBUG = 0;
 
 =head1 NAME
@@ -23,24 +21,25 @@ DBIx::DBSchema::Table - Table objects
 
   use DBIx::DBSchema::Table;
 
-  #old style (depriciated)
+  #new style (preferred), pass a hashref of parameters
+  $table = new DBIx::DBSchema::Table (
+    {
+      name        => "table_name",
+      primary_key => "primary_key",
+      columns     => \@dbix_dbschema_column_objects,
+      #deprecated# unique      => $dbix_dbschema_colgroup_unique_object,
+      #deprecated# 'index'     => $dbix_dbschema_colgroup_index_object,
+      indices     => \@dbix_dbschema_index_objects,
+    }
+  );
+
+  #old style (VERY deprecated)
   $table = new DBIx::DBSchema::Table (
     "table_name",
     "primary_key",
     $dbix_dbschema_colgroup_unique_object,
     $dbix_dbschema_colgroup_index_object,
     @dbix_dbschema_column_objects,
-  );
-
-  #new style (preferred), pass a hashref of parameters
-  $table = new DBIx::DBSchema::Table (
-    {
-      name        => "table_name",
-      primary_key => "primary_key",
-      unique      => $dbix_dbschema_colgroup_unique_object,
-      'index'     => $dbix_dbschema_colgroup_index_object,
-      columns     => \@dbix_dbschema_column_objects,
-    }
   );
 
   $table->addcolumn ( $dbix_dbschema_column_object );
@@ -51,11 +50,16 @@ DBIx::DBSchema::Table - Table objects
   $primary_key = $table->primary_key;
   $table->primary_key("primary_key");
 
-  $dbix_dbschema_colgroup_unique_object = $table->unique;
-  $table->unique( $dbix_dbschema__colgroup_unique_object );
+  #deprecated# $dbix_dbschema_colgroup_unique_object = $table->unique;
+  #deprecated# $table->unique( $dbix_dbschema__colgroup_unique_object );
 
-  $dbix_dbschema_colgroup_index_object = $table->index;
-  $table->index( $dbix_dbschema_colgroup_index_object );
+  #deprecated# $dbix_dbschema_colgroup_index_object = $table->index;
+  #deprecated# $table->index( $dbix_dbschema_colgroup_index_object );
+
+  %indices = $table->indices;
+  $dbix_dbschema_index_object = $indices{'index_name'};
+  @all_index_names = keys %indices;
+  @all_dbix_dbschema_index_objects = values %indices;
 
   @column_names = $table->columns;
 
@@ -77,8 +81,6 @@ DBIx::DBSchema::Table objects represent a single database table.
 
 =over 4
 
-=item new [ TABLE_NAME [ , PRIMARY_KEY [ , UNIQUE [ , INDEX [ , COLUMN... ] ] ] ] ]
-
 =item new HASHREF
 
 Creates a new DBIx::DBSchema::Table object.  The preferred usage is to pass a
@@ -87,17 +89,24 @@ hash reference of named parameters.
   {
     name        => TABLE_NAME,
     primary_key => PRIMARY_KEY,
-    unique      => UNIQUE,
-    'index'     => INDEX,
-    columns     => COLUMNS
+    columns     => COLUMNS,
+    indices     => INDICES,
+    #deprecated# unique => UNIQUE,
+    #deprecated# index  => INDEX,
   }
 
 TABLE_NAME is the name of the table.  PRIMARY_KEY is the primary key (may be
-empty).  UNIQUE is a DBIx::DBSchema::ColGroup::Unique object (see
-L<DBIx::DBSchema::ColGroup::Unique>).  INDEX is a
+empty).  COLUMNS is a reference to an array of DBIx::DBSchema::Column objects
+(see L<DBIx::DBSchema::Column>).  INDICES is a reference to an array of 
+DBIx::DBSchema::Index objects (see L<DBIx::DBSchema::Index>), or a hash
+reference of index names (keys) and DBIx::DBSchema::Index objects (values).
+
+Deprecated options:
+
+UNIQUE was a DBIx::DBSchema::ColGroup::Unique object (see
+L<DBIx::DBSchema::ColGroup::Unique>).  INDEX was a
 DBIx::DBSchema::ColGroup::Index object (see
-L<DBIx::DBSchema::ColGroup::Index>).  COLUMNS is a reference to an array of
-DBIx::DBSchema::Column objects (see L<DBIx::DBSchema::Column>).
+L<DBIx::DBSchema::ColGroup::Index>).
 
 =cut
 
@@ -112,7 +121,14 @@ sub new {
     $self->{column_order} = [ map { $_->name } @{$self->{columns}} ];
     $self->{columns} = { map { $_->name, $_ } @{$self->{columns}} };
 
+    $self->{indices} = { map { $_->name, $_ } @{$self->{indices}} }
+       if ref($self->{indices}) eq 'ARRAY';
+
   } else {
+
+    carp "Old-style $class creation without named parameters is deprecated!";
+    #croak "FATAL: old-style $class creation no longer supported;".
+    #      " use named parameters";
 
     my($name,$primary_key,$unique,$index,@columns) = @_;
 
@@ -166,38 +182,77 @@ have to have ODBC installed or connect to the database via ODBC.
 
 sub new_odbc {
   my( $proto, $dbh, $name) = @_;
+
   my $driver = _load_driver($dbh);
   my $sth = _null_sth($dbh, $name);
   my $sthpos = 0;
-  $proto->new (
-    $name,
-    scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
-    DBIx::DBSchema::ColGroup::Unique->new(
-      $driver
-       ? [values %{eval "DBIx::DBSchema::DBD::$driver->unique(\$dbh, \$name)"}]
-       : []
-    ),
-    DBIx::DBSchema::ColGroup::Index->new(
-      $driver
-      ? [ values %{eval "DBIx::DBSchema::DBD::$driver->index(\$dbh, \$name)"} ]
-      : []
-    ),
-    map { 
-      my $type_info = scalar($dbh->type_info($sth->{TYPE}->[$sthpos]))
-        or die "DBI::type_info ". $dbh->{Driver}->{Name}. " driver ".
-               "returned no results for type ".  $sth->{TYPE}->[$sthpos];
-      new DBIx::DBSchema::Column
-          $_,
-          $type_info->{'TYPE_NAME'},
-          #"SQL_". uc($type_info->{'TYPE_NAME'}),
-          $sth->{NULLABLE}->[$sthpos],
-          &{ $create_params{ $type_info->{CREATE_PARAMS} } }( $sth, $sthpos++ ),          $driver && #default
-            ${ [
-              eval "DBIx::DBSchema::DBD::$driver->column(\$dbh, \$name, \$_)"
-            ] }[4]
-          # DB-local
-    } @{$sth->{NAME}}
-  );
+
+  my $indices_hr =
+    ( $driver
+        ? eval "DBIx::DBSchema::DBD::$driver->indices(\$dbh, \$name)"
+        : {}
+    );
+
+  $proto->new({
+    'name'        => $name,
+    'primary_key' => scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
+
+    'columns'     => [
+    
+      map { 
+
+            my $col_name = $_;
+
+            my $type_info = scalar($dbh->type_info($sth->{TYPE}->[$sthpos]))
+              or die "DBI::type_info ". $dbh->{Driver}->{Name}. " driver ".
+                     "returned no results for type ".  $sth->{TYPE}->[$sthpos];
+
+            my $length = &{ $create_params{ $type_info->{CREATE_PARAMS} } }
+                          ( $sth, $sthpos++ );
+
+            my $default = '';
+            if ( $driver ) {
+              $default = ${ [
+                eval "DBIx::DBSchema::DBD::$driver->column(\$dbh, \$name, \$_)"
+              ] }[4];
+            }
+
+            DBIx::DBSchema::Column->new({
+                'name'    => $col_name,
+                #'type'    => "SQL_". uc($type_info->{'TYPE_NAME'}),
+                'type'    => $type_info->{'TYPE_NAME'},
+                'null'    => $sth->{NULLABLE}->[$sthpos],
+                'length'  => $length,          
+                'default' => $default,
+                #'local'   => # DB-local
+            });
+
+          }
+          @{$sth->{NAME}}
+    
+    ],
+
+    #old-style indices
+    #DBIx::DBSchema::ColGroup::Unique->new(
+    #  $driver
+    #   ? [values %{eval "DBIx::DBSchema::DBD::$driver->unique(\$dbh, \$name)"}]
+    #   : []
+    #),
+    #DBIx::DBSchema::ColGroup::Index->new(
+    #  $driver
+    #  ? [ values %{eval "DBIx::DBSchema::DBD::$driver->index(\$dbh, \$name)"} ]
+    #  : []
+    #),
+
+    #new-style indices
+    'indices' => { map { my $indexname = $_;
+                         $indexname =>
+                           DBIx::DBSchema::Index->new($indices_hr->{$indexname})
+                       } 
+                       keys %$indices_hr
+                 },
+
+  });
 }
 
 =item new_native DATABASE_HANDLE TABLE_NAME
@@ -213,19 +268,39 @@ engine (currently, MySQL and PostgreSQL).
 sub new_native {
   my( $proto, $dbh, $name) = @_;
   my $driver = _load_driver($dbh);
-  $proto->new (
-    $name,
-    scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
-    DBIx::DBSchema::ColGroup::Unique->new(
-      [ values %{eval "DBIx::DBSchema::DBD::$driver->unique(\$dbh, \$name)"} ]
-    ),
-    DBIx::DBSchema::ColGroup::Index->new(
-      [ values %{eval "DBIx::DBSchema::DBD::$driver->index(\$dbh, \$name)"} ]
-    ),
-    map {
-      DBIx::DBSchema::Column->new( @{$_} )
-    } eval "DBIx::DBSchema::DBD::$driver->columns(\$dbh, \$name)"
+
+  my $indices_hr =
+  ( $driver
+      ? eval "DBIx::DBSchema::DBD::$driver->indices(\$dbh, \$name)"
+      : {}
   );
+
+  $proto->new({
+    'name'        => $name,
+    'primary_key' => scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
+    'columns'     => [
+    
+      map DBIx::DBSchema::Column->new( @{$_} ),
+          eval "DBIx::DBSchema::DBD::$driver->columns(\$dbh, \$name)"
+    ],
+
+    #old-style indices
+    #DBIx::DBSchema::ColGroup::Unique->new(
+    #  [ values %{eval "DBIx::DBSchema::DBD::$driver->unique(\$dbh, \$name)"} ]
+    #),
+    #DBIx::DBSchema::ColGroup::Index->new(
+    #  [ values %{eval "DBIx::DBSchema::DBD::$driver->index(\$dbh, \$name)"} ]
+    #),
+    
+    #new-style indices
+    'indices' => { map { my $indexname = $_;
+                         $indexname =>
+                           DBIx::DBSchema::Index->new($indices_hr->{$indexname})
+                       } 
+                       keys %$indices_hr
+                 },
+
+  });
 }
 
 =item addcolumn COLUMN
@@ -294,12 +369,20 @@ sub primary_key {
 
 =item unique [ UNIQUE ]
 
+This method is deprecated and included for backwards-compatibility only.
+See L</indices> for the current method to access unique and non-unique index
+objects.
+
 Returns or sets the DBIx::DBSchema::ColGroup::Unique object.
 
 =cut
 
 sub unique { 
   my($self,$value)=@_;
+
+  carp ref($self). "->unique method is deprecated; see ->indices";
+  #croak ref($self). "->unique method is deprecated; see ->indices";
+
   if ( defined($value) ) {
     $self->{unique} = $value;
   } else {
@@ -309,12 +392,20 @@ sub unique {
 
 =item index [ INDEX ]
 
+This method is deprecated and included for backwards-compatibility only.
+See L</indices> for the current method to access unique and non-unique index
+objects.
+
 Returns or sets the DBIx::DBSchema::ColGroup::Index object.
 
 =cut
 
 sub index { 
   my($self,$value)=@_;
+
+  carp ref($self). "->index method is deprecated; see ->indices";
+  #croak ref($self). "->index method is deprecated; see ->indices";
+
   if ( defined($value) ) {
     $self->{'index'} = $value;
   } else {
@@ -345,6 +436,38 @@ COLUMN_NAME.
 sub column {
   my($self,$column)=@_;
   $self->{'columns'}->{$column};
+}
+
+=item indices COLUMN_NAME
+
+Returns a list of key-value pairs suitable for assigning to a hash.  Keys are
+index names, and values are index objects (see L<DBIx::DBSchema::Index>).
+
+=cut
+
+sub indices {
+  my $self = shift;
+  exists( $self->{'indices'} )
+    ? %{ $self->{'indices'} }
+    : ();
+}
+
+=item unique_singles
+
+Meet exciting and unique singles using this method!
+
+This method returns a list of column names that are indexed with their own,
+unique, non-compond (that's the "single" part) indices.
+
+=cut
+
+sub unique_singles {
+  my $self = shift;
+  my %indices = $self->indices;
+
+  map { ${ $indices{$_}->columns }[0] }
+      grep { $indices{$_}->unique && scalar(@{$indices{$_}->columns}) == 1 }
+           keys %indices;
 }
 
 =item sql_create_table [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
@@ -397,21 +520,38 @@ sub sql_create_table {
     "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n"
   );
 
-  push @r, map {
-                 #my($index) = $self->name. "__". $_ . "_idx";
-                 #$index =~ s/,\s*/_/g;
-                 my $index = $self->name. $indexnum++;
-                 "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
-               } $self->unique->sql_list
-    if $self->unique;
+  if ( $self->unique ) {
 
-  push @r, map {
-                 #my($index) = $self->name. "__". $_ . "_idx";
-                 #$index =~ s/,\s*/_/g;
-                 my $index = $self->name. $indexnum++;
-                 "CREATE INDEX $index ON ". $self->name. " ($_)\n"
-               } $self->index->sql_list
-    if $self->index;
+    warn "WARNING: DBIx::DBSchema::Table object for ". $self->name.
+         " table has deprecated (non-named) unique indices\n";
+
+    push @r, map {
+                   #my($index) = $self->name. "__". $_ . "_idx";
+                   #$index =~ s/,\s*/_/g;
+                   my $index = $self->name. $indexnum++;
+                   "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
+                 } $self->unique->sql_list;
+
+  }
+
+  if ( $self->index ) {
+
+    warn "WARNING: DBIx::DBSchema::Table object for ". $self->name.
+         " table has deprecated (non-named) indices\n";
+
+    push @r, map {
+                   #my($index) = $self->name. "__". $_ . "_idx";
+                   #$index =~ s/,\s*/_/g;
+                   my $index = $self->name. $indexnum++;
+                   "CREATE INDEX $index ON ". $self->name. " ($_)\n"
+                 } $self->index->sql_list;
+  }
+
+  my %indices = $self->indices;
+  #push @r, map { $indices{$_}->sql_create_index( $self->name ) } keys %indices;
+  foreach my $index ( keys %indices ) {
+    push @r, $indices{$index}->sql_create_index( $self->name );
+  }
 
   #$self->primary_key($saved_pkey) if $saved_pkey;
   @r;
@@ -439,22 +579,30 @@ to the provided table, also a DBIx::DBSchema::Table object.
 sub sql_alter_table {
   my( $self, $new, $dbh ) = ( shift, shift, _dbh(@_) );
 
+  my $driver = _load_driver($dbh);
+
   my $table = $self->name;
 
   my @r = ();
+  my @r_later = ();
+  my $tempnum = 1;
+
+  ###
+  # columns
+  ###
 
   foreach my $column ( $new->columns ) {
 
     if ( $self->column($column) )  {
 
-      warn "  $table.$column exists\n" if $DEBUG > 2;
+      warn "  $table.$column exists\n" if $DEBUG > 1;
 
       push @r,
         $self->column($column)->sql_alter_column( $new->column($column), $dbh );
 
     } else {
   
-      warn "column $table.$column does not exist.\n" if $DEBUG;
+      warn "column $table.$column does not exist.\n" if $DEBUG > 1;
 
       push @r,
         $new->column($column)->sql_add_column( $dbh );
@@ -462,13 +610,74 @@ sub sql_alter_table {
     }
   
   }
-  
-  #should eventually check & create missing indices ( & delete ones not in $new)
-  
-  #should eventually drop columns not in $new
 
-  warn join("\n", @r). "\n"
-    if $DEBUG;
+  #should eventually drop columns not in $new...
+  
+  ###
+  # indices
+  ###
+
+  my %old_indices = $self->indices;
+  my %new_indices = $new->indices;
+
+  foreach my $old ( keys %old_indices ) {
+
+    if ( exists( $new_indices{$old} )
+         && $old_indices{$old}->cmp( $new_indices{$old} )
+       )
+    {
+      warn "index $table.$old is identical; not changing\n" if $DEBUG > 1;
+      delete $old_indices{$old};
+      delete $new_indices{$old};
+
+    } elsif ( $driver eq 'Pg' and $dbh->{'pg_server_version'} >= 80000 ) {
+
+      my @same = grep { $old_indices{$old}->cmp_noname( $new_indices{$_} ) }
+                      keys %new_indices;
+
+      if ( @same ) {
+
+        #warn if there's more than one?
+        my $same = shift @same;
+
+        warn "index $table.$old is identical to $same; renaming\n"
+          if $DEBUG > 1;
+
+        my $temp = 'dbs_temp'.$tempnum++;
+
+        push @r, "ALTER INDEX $old RENAME TO $temp";
+        push @r_later, "ALTER INDEX $temp RENAME TO $same";
+
+        delete $old_indices{$old};
+        delete $new_indices{$same};
+
+      }
+
+    }
+
+  }
+
+  foreach my $old ( keys %old_indices ) {
+    warn "removing obsolete index $table.$old ON ( ".
+         $old_indices{$old}->columns_sql. " )\n"
+      if $DEBUG > 1;
+    push @r, "DROP INDEX $old".
+             ( $driver eq 'mysql' ? " ON $table" : '');
+  }
+
+  foreach my $new ( keys %new_indices ) {
+    warn "creating new index $table.$new\n" if $DEBUG > 1;
+    push @r, $new_indices{$new}->sql_create_index($table);
+  }
+  
+  ###
+  # return the statements
+  ###
+  
+  push @r, @r_later;
+
+  warn join('', map "$_\n", @r)
+    if $DEBUG && @r;
 
   @r;
 
@@ -493,8 +702,9 @@ with no indices.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2000-2006 Ivan Kohler
+Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
+Copyright (c) 2007 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -502,14 +712,21 @@ the same terms as Perl itself.
 =head1 BUGS
 
 sql_create_table() has database-specific foo that probably ought to be
-abstracted into the DBIx::DBSchema::DBD:: modules.
+abstracted into the DBIx::DBSchema::DBD:: modules (or no?  it doesn't anymore?).
 
-sql_create_table may change or destroy the object's data.  If you need to use
+sql_alter_table() also has database-specific foo that ought to be abstracted
+into the DBIx::DBSchema::DBD:: modules.
+
+sql_create_table() may change or destroy the object's data.  If you need to use
 the object after sql_create_table, make a copy beforehand.
 
 Some of the logic in new_odbc might be better abstracted into Column.pm etc.
 
-sql_alter_table ought to update indices, and drop columns not in $new
+sql_alter_table ought to drop columns not in $new
+
+Add methods to get and set specific indices, by name? (like column COLUMN_NAME)
+
+indices method should be a setter, not just a getter?
 
 =head1 SEE ALSO
 
