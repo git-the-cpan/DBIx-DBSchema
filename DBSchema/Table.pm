@@ -10,7 +10,7 @@ use DBIx::DBSchema::Index;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 $DEBUG = 0;
 
 =head1 NAME
@@ -377,11 +377,18 @@ Returns or sets the DBIx::DBSchema::ColGroup::Unique object.
 
 =cut
 
-sub unique { 
-  my($self,$value)=@_;
+sub unique {
+    my $self = shift;
 
-  carp ref($self). "->unique method is deprecated; see ->indices";
-  #croak ref($self). "->unique method is deprecated; see ->indices";
+    carp ref($self) . "->unique method is deprecated; see ->indices";
+    #croak ref($self). "->unique method is deprecated; see ->indices";
+
+    $self->_unique(@_);
+}
+
+sub _unique {
+
+  my ($self,$value)=@_;
 
   if ( defined($value) ) {
     $self->{unique} = $value;
@@ -401,10 +408,17 @@ Returns or sets the DBIx::DBSchema::ColGroup::Index object.
 =cut
 
 sub index { 
-  my($self,$value)=@_;
+  my $self = shift;
 
   carp ref($self). "->index method is deprecated; see ->indices";
   #croak ref($self). "->index method is deprecated; see ->indices";
+
+  $self->_index(@_);
+}
+
+
+sub _index {
+  my($self,$value)=@_;
 
   if ( defined($value) ) {
     $self->{'index'} = $value;
@@ -520,7 +534,7 @@ sub sql_create_table {
     "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n"
   );
 
-  if ( $self->unique ) {
+  if ( $self->_unique ) {
 
     warn "WARNING: DBIx::DBSchema::Table object for ". $self->name.
          " table has deprecated (non-named) unique indices\n";
@@ -534,7 +548,7 @@ sub sql_create_table {
 
   }
 
-  if ( $self->index ) {
+  if ( $self->_index ) {
 
     warn "WARNING: DBIx::DBSchema::Table object for ". $self->name.
          " table has deprecated (non-named) indices\n";
@@ -562,15 +576,22 @@ sub sql_create_table {
 Returns a list of SQL statements to alter this table so that it is identical
 to the provided table, also a DBIx::DBSchema::Table object.
 
- #Optionally, the data source can be specified by passing an open DBI database
- #handle, or by passing the DBI data source name, username and password.  
- #
- #If passed a DBI data source (or handle) such as `DBI:Pg:dbname=database', will
- #use PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
- #applicable) may also be supported in the future.
- #
- #If not passed a data source (or handle), or if there is no driver for the
- #specified database, will attempt to use generic SQL syntax.
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and used to check the database version as well
+as for more reliable quoting and type mapping.  Note that the database
+connection will be used passively, B<not> to actually run the CREATE
+statements.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database' or
+`DBI:Pg:dbname=database', will use syntax specific to that database engine.
+Currently supported databases are MySQL and PostgreSQL.
+
+If not passed a data source (or handle), or if there is no driver for the
+specified database, will attempt to use generic SQL syntax.
 
 =cut
 
@@ -588,7 +609,7 @@ sub sql_alter_table {
   my $tempnum = 1;
 
   ###
-  # columns
+  # columns (add/alter)
   ###
 
   foreach my $column ( $new->columns ) {
@@ -669,6 +690,18 @@ sub sql_alter_table {
     warn "creating new index $table.$new\n" if $DEBUG > 1;
     push @r, $new_indices{$new}->sql_create_index($table);
   }
+
+  ###
+  # columns (drop)
+  ###
+
+  foreach my $column ( grep !$new->column($_), $self->columns ) {
+
+    warn "column $table.$column should be dropped.\n" if $DEBUG;
+
+    push @r, $self->column($column)->sql_drop_column( $dbh );
+
+  }
   
   ###
   # return the statements
@@ -681,6 +714,14 @@ sub sql_alter_table {
 
   @r;
 
+}
+
+sub sql_drop_table {
+  my( $self, $dbh ) = ( shift, _dbh(@_) );
+
+  my $name = $self->name;
+
+  ("DROP TABLE $name");
 }
 
 sub _null_sth {

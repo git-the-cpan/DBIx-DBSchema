@@ -511,6 +511,23 @@ sub sql_alter_column {
   @r;
 
 }
+=item sql_drop_column [ DBH ] 
+
+Returns a list of SQL statements to drop this column from an existing table.
+
+The optional database handle or DBI data source/username/password is not yet
+used.
+
+=cut
+
+sub sql_drop_column {
+ my( $self, $dbh ) = ( shift, _dbh(@_) );
+ 
+ my $table = $self->table_name;
+ my $name = $self->name;
+ 
+ ("ALTER TABLE $table DROP COLUMN $name"); # XXX what about indexes???
+}
 
 =back
 

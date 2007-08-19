@@ -9,7 +9,7 @@ use Carp qw(confess);
 use DBI;
 
 @ISA = qw(Exporter);
-@EXPORT_OK = qw( _load_driver _dbh );
+@EXPORT_OK = qw( _load_driver _dbh _parse_opt );
 
 sub _load_driver {
   my($dbh) = @_;
@@ -37,6 +37,15 @@ sub _dbh {
   }
 
   ( $dbh, $created_dbh );
+}
+
+sub _parse_opt {
+  my $optref = shift;
+  if ( ref( $optref->[0] ) eq 'HASH' ) {
+    shift @$optref;
+  } else {
+    {};
+  }
 }
 
 1;

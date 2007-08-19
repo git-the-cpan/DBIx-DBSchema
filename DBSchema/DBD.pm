@@ -107,31 +107,31 @@ sub indices {
   my $unique_hr = $proto->unique( @param );
   my $index_hr  = $proto->index(  @param );
 
-  my $gratuitous_hashref_to_force_scalar_context =
-  {
-
-    (
-      map {
-            $_ => { 'name'    => $_,
-                    'unique'  => 1,
-                    'columns' => $unique_hr->{$_},
-                  },
-          }
-          keys %$unique_hr
-    ),
-
-    (
-      map {
-            $_ => { 'name'    => $_,
-                    'unique'  => 0,
-                    'columns' => $index_hr->{$_},
-                  },
-          }
-          keys %$index_hr
-    ),
-
-  };
-
+  scalar(
+    {
+  
+      (
+        map {
+              $_ => { 'name'    => $_,
+                      'unique'  => 1,
+                      'columns' => $unique_hr->{$_},
+                    },
+            }
+            keys %$unique_hr
+      ),
+  
+      (
+        map {
+              $_ => { 'name'    => $_,
+                      'unique'  => 0,
+                      'columns' => $index_hr->{$_},
+                    },
+            }
+            keys %$index_hr
+      ),
+  
+    }
+  );
 }
 
 =item default_db_catalog

@@ -1,5 +1,14 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.34 Sun Aug 19 10:08:51 PDT 2007
+        - More work on update schema from Slaven Rezic <srezic@cpan.org>,
+          thanks!
+          + implement table dropping (closes: CPAN#27936)
+          + implement column dropping (closes: CPAN#27896)
+        - Fix to quiet warnings from internal use of old API from Jesse Vincent
+          <jesse+cpan@fsck.com>, thanks! (closes: CPAN#27958)
+        - Make table dropping optional, not the default.
+
 0.33 Thu Jun 28 18:46:15 PDT 2007
         - Overhaul of index representation: indices (both normal and unique)
           now have names and are DBIx::DBSchema::Index objects

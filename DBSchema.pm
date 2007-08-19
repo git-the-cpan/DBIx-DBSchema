@@ -3,15 +3,15 @@ package DBIx::DBSchema;
 use strict;
 use vars qw($VERSION $DEBUG $errstr);
 use Storable;
-use DBIx::DBSchema::_util qw(_load_driver _dbh);
-use DBIx::DBSchema::Table 0.04;
+use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
+use DBIx::DBSchema::Table 0.05;
 use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = "0.33";
-#$VERSION = eval $VERSION; # modperlstyle: convert the string into a number
+$VERSION = "0.34";
+$VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 $DEBUG = 0;
 
@@ -220,8 +220,10 @@ passing the DBI data source name, username and password.
 
 Although the username and password are optional, it is best to call this method
 with a database handle or data source including a valid username and password -
-a DBI connection will be opened and the quoting and type mapping will be more
-reliable.
+a DBI connection will be opened and used to check the database version as well
+as for more reliable quoting and type mapping.  Note that the database
+connection will be used passively, B<not> to actually run the CREATE
+statements.
 
 If passed a DBI data source (or handle) such as `DBI:mysql:database' or
 `DBI:Pg:dbname=database', will use syntax specific to that database engine.
@@ -237,35 +239,45 @@ sub sql {
   map { $self->table($_)->sql_create_table($dbh); } $self->tables;
 }
 
-=item sql_update_schema PROTOTYPE_SCHEMA [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
+=item sql_update_schema [ OPTIONS_HASHREF, ] PROTOTYPE_SCHEMA [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
 
 Returns a list of SQL statements to update this schema so that it is idential
 to the provided prototype schema, also a DBIx::DBSchema object.
 
- #Optionally, the data source can be specified by passing an open DBI database
- #handle, or by passing the DBI data source name, username and password.  
- #
- #If passed a DBI data source (or handle) such as `DBI:mysql:database' or
- #`DBI:Pg:dbname=database', will use syntax specific to that database engine.
- #Currently supported databases are MySQL and PostgreSQL.
- #
- #If not passed a data source (or handle), or if there is no driver for the
- #specified database, will attempt to use generic SQL syntax.
-
-Right now this method knows how to add new tables and alter existing tables.
-It doesn't know how to drop tables yet.
+Right now this method knows how to add new tables and alter existing tables,
+including indices.  If specifically requested by passing an options hashref
+with B<drop_tables> set true before all other arguments, it will also drop
+tables.
 
 See L<DBIx::DBSchema::Table/sql_alter_table>,
 L<DBIx::DBSchema::Column/sql_add_coumn> and
 L<DBIx::DBSchema::Column/sql_alter_column> for additional specifics and
 limitations.
 
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and used to check the database version as well
+as for more reliable quoting and type mapping.  Note that the database
+connection will be used passively, B<not> to actually run the CREATE
+statements.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database' or
+`DBI:Pg:dbname=database', will use syntax specific to that database engine.
+Currently supported databases are MySQL and PostgreSQL.
+
+If not passed a data source (or handle), or if there is no driver for the
+specified database, will attempt to use generic SQL syntax.
+
 =cut
 
 #gosh, false laziness w/DBSchema::Table::sql_alter_schema
 
 sub sql_update_schema {
-  my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
+  #my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
+  my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
 
   my @r = ();
 
@@ -289,7 +301,20 @@ sub sql_update_schema {
   
   }
 
-  # should eventually drop tables not in $new
+  if ( $opt->{'drop_tables'} ) {
+
+    warn "drop_tables enabled\n" if $DEBUG;
+
+    # drop tables not in $new
+    foreach my $table ( grep !$new->table($_), $self->tables ) {
+
+      warn "table $table should be dropped.\n" if $DEBUG;
+
+      push @r, $self->table($table)->sql_drop_table( $dbh );
+
+    }
+
+  }
 
   warn join("\n", @r). "\n"
     if $DEBUG > 1;
@@ -298,7 +323,7 @@ sub sql_update_schema {
   
 }
 
-=item update_schema PROTOTYPE_SCHEMA, DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ]
+=item update_schema [ OPTIONS_HASHREF, ] PROTOTYPE_SCHEMA, DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ]
 
 Same as sql_update_schema, except actually runs the SQL commands to update
 the schema.  Throws a fatal error if any statement fails.
@@ -306,9 +331,10 @@ the schema.  Throws a fatal error if any statement fails.
 =cut
 
 sub update_schema {
-  my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
+  #my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
+  my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
 
-  foreach my $statement ( $self->sql_update_schema( $new, $dbh ) ) {
+  foreach my $statement ( $self->sql_update_schema( $opt, $new, $dbh ) ) {
     $dbh->do( $statement )
       or die "Error: ". $dbh->errstr. "\n executing: $statement";
   }
@@ -354,18 +380,18 @@ sub pretty_print {
         #old style index representation..
 
         ( 
-          $table->{'unique'} # $table->unique
+          $table->{'unique'} # $table->_unique
             ? "  'unique' => [ ". join(', ',
                 map { "[ '". join("', '", @{$_}). "' ]" }
-                    @{$table->unique->lol_ref}
+                    @{$table->_unique->lol_ref}
               ).  " ],\n"
             : ''
         ).
 
-        ( $table->{'index'} # $table->index
+        ( $table->{'index'} # $table->_index
             ? "  'index' => [ ". join(', ',
                 map { "[ '". join("', '", @{$_}). "' ]" }
-                    @{$table->index->lol_ref}
+                    @{$table->_index->lol_ref}
               ). " ],\n"
             : ''
         ).
@@ -380,7 +406,7 @@ sub pretty_print {
                       ? "              'using'  => '". $index->using ."',\n"
                       : ''
                   ).
-                  "                   'unique'  => ". $index->unique .",\n".
+                  "                   'unique'  => ". $index->_unique .",\n".
                   "                   'columns' => [ '".
                                               join("', '", @{$index->columns} ).
                                               "' ],\n".
@@ -472,7 +498,11 @@ Charles Shapiro <charles.shapiro@numethods.com> and Mitchell Friedman
 
 Daniel Hanks <hanksdc@about-inc.com> contributed the Oracle driver.
 
-Jesse Vincent contributed the SQLite driver.
+Jesse Vincent contributed the SQLite driver and fixes to quiet down
+internal usage of the old API.
+
+Slaven Rezic <srezic@cpan.org> contributed column and table dropping, Pg
+bugfixes and more.
 
 =head1 CONTRIBUTIONS
 
@@ -495,8 +525,8 @@ Multiple primary keys are not yet supported.
 Foreign keys and other constraints are not yet supported.
 
 Eventually it would be nice to have additional transformations (deleted,
-modified columns, deleted tables).  sql_update_schema doesn't drop tables
-or deal with deleted or modified columns yet.
+modified columns).  sql_update_schema doesn't deal with deleted or modified
+columns yet.
 
 Need to port and test with additional databases
 
