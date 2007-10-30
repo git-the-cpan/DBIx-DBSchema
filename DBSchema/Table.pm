@@ -10,7 +10,7 @@ use DBIx::DBSchema::Index;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 $DEBUG = 0;
 
 =head1 NAME
@@ -87,10 +87,11 @@ Creates a new DBIx::DBSchema::Table object.  The preferred usage is to pass a
 hash reference of named parameters.
 
   {
-    name        => TABLE_NAME,
-    primary_key => PRIMARY_KEY,
-    columns     => COLUMNS,
-    indices     => INDICES,
+    name          => TABLE_NAME,
+    primary_key   => PRIMARY_KEY,
+    columns       => COLUMNS,
+    indices       => INDICES,
+    local_options => OPTIONS,
     #deprecated# unique => UNIQUE,
     #deprecated# index  => INDEX,
   }
@@ -100,6 +101,8 @@ empty).  COLUMNS is a reference to an array of DBIx::DBSchema::Column objects
 (see L<DBIx::DBSchema::Column>).  INDICES is a reference to an array of 
 DBIx::DBSchema::Index objects (see L<DBIx::DBSchema::Index>), or a hash
 reference of index names (keys) and DBIx::DBSchema::Index objects (values).
+OPTIONS is a scalar of database-specific table options, such as "WITHOUT OIDS"
+for Pg or "TYPE=InnoDB" for mysql.
 
 Deprecated options:
 
@@ -346,6 +349,21 @@ sub name {
   }
 }
 
+=item local_options [ OPTIONS ]
+
+Returns or sets the database-specific table options string.
+
+=cut
+
+sub local_options {
+  my($self,$value)=@_;
+  if ( defined($value) ) {
+    $self->{local_options} = $value;
+  } else {
+    $self->{local_options};
+  }
+}
+
 =item primary_key [ PRIMARY_KEY ]
 
 Returns or sets the primary key.
@@ -531,7 +549,8 @@ sub sql_create_table {
   my $indexnum = 1;
 
   my @r = (
-    "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n"
+    "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n".
+    $self->local_options
   );
 
   if ( $self->_unique ) {

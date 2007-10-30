@@ -5,7 +5,7 @@ use vars qw($VERSION);
 use Carp;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
 
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 =head1 NAME
 
@@ -249,15 +249,22 @@ sub line {
 
   my $driver = $dbh ? _load_driver($dbh) : '';
 
+  ##
+  # type mapping
+  ## 
+
   my %typemap;
   %typemap = eval "\%DBIx::DBSchema::DBD::${driver}::typemap" if $driver;
   my $type = defined( $typemap{uc($self->type)} )
     ? $typemap{uc($self->type)}
     : $self->type;
 
-  my $null = $self->null;
+  ##
+  # set default for the callback...
+  ##
 
   my $default;
+  my $orig_default = $self->default;
   if ( defined($self->default) && !ref($self->default) && $self->default ne ''
        && ref($dbh)
        # false laziness: nicked from FS::Record::_quote
@@ -269,15 +276,38 @@ sub line {
   } else {
     $default = ref($self->default) ? ${$self->default} : $self->default;
   }
+  $self->default($default);
 
-  #this should be a callback into the driver
-  if ( $driver eq 'mysql' ) { #yucky mysql hack
-    $null ||= "NOT NULL";
-    $self->local('AUTO_INCREMENT') if uc($self->type) eq 'SERIAL';
-  } elsif ( $driver =~ /^(?:Pg|SQLite)$/ ) { #yucky Pg/SQLite hack
-    $null ||= "NOT NULL";
-    $null =~ s/^NULL$//;
-  }
+  ##
+  # callback into the database-specific driver
+  ##
+
+  my $dbd = "DBIx::DBSchema::DBD::$driver";
+  my $hashref = $dbd->column_callback( $dbh, $self->table_name, $self );
+
+  $self->default($orig_default);
+
+  $type = $hashref->{'effective_type'}
+    if $hashref->{'effective_type'};
+
+  my $null = $self->null;
+
+  #we seem to do this for mysql/Pg/SQLite, i think this should be the default
+  #add something to $hashref if drivers need to overrdide?
+  $null ||= "NOT NULL";
+
+  $null =~ s/^NULL$// unless $hashref->{'explicit_null'};
+
+  $default = $hashref->{'effective_default'}
+    if $hashref->{'effective_default'};
+
+  my $local = $self->local;
+  $local = $hashref->{'effective_local'}
+    if $hashref->{'effective_local'};
+
+  ##
+  # return column line
+  ## 
 
   join(' ',
     $self->name,
@@ -290,10 +320,7 @@ sub line {
       ? 'DEFAULT '. $default
       : ''
     ),
-    ( ( $driver eq 'mysql' && defined($self->local) )
-      ? $self->local
-      : ''
-    ),
+    ( defined($local) ? $local : ''),
   );
 
 }
@@ -325,90 +352,36 @@ sub sql_add_column {
 
   my $driver = $dbh ? _load_driver($dbh) : '';
 
-  my @after_add = ();
+  my @sql = ();
+  my $table = $self->table_name;
+
+  my $dbd = "DBIx::DBSchema::DBD::$driver";
+  my $hashref = $dbd->add_column_callback( $dbh, $table, $self );
 
   my $real_type = '';
-  if (  $driver eq 'Pg' && $self->type eq 'serial' ) {
-    $real_type = 'serial';
-    $self->type('int');
-
-    push @after_add, sub {
-      my($table, $column) = @_;
-
-      #needs more work for old Pg?
-      
-      my $pg_server_version = $dbh->{'pg_server_version'};
-      unless ( $pg_server_version =~ /\d/ ) {
-        warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
-        $pg_server_version = 70300;
-      }
-
-      my $nextval;
-      if ( $pg_server_version >= 70300 ) {
-        $nextval = "nextval('public.${table}_${column}_seq'::text)";
-      } else {
-        $nextval = "nextval('${table}_${column}_seq'::text)";
-      }
-
-      (
-        "ALTER TABLE $table ALTER COLUMN $column SET DEFAULT $nextval",
-        "CREATE SEQUENCE ${table}_${column}_seq",
-        "UPDATE $table SET $column = $nextval WHERE $column IS NULL",
-        #"ALTER TABLE $table ALTER $column SET NOT NULL",
-      );
-
-    };
-
+  if ( $hashref->{'effective_type'} ) {
+    $real_type = $self->type;
+    $self->type($hashref->{'effective_type'});
   }
 
   my $real_null = undef;
-  if ( $driver eq 'Pg' && ! $self->null ) {
+  if ( exists($hashref->{'effective_null'}) ) {
     $real_null = $self->null;
-    $self->null('NULL');
-
-    my $pg_server_version = $dbh->{'pg_server_version'};
-    unless ( $pg_server_version =~ /\d/ ) {
-      warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
-      $pg_server_version = 70300;
-    }
-
-    if ( $pg_server_version >= 70300 ) { #this did work on 7.3
-    #if ( $pg_server_version > 70400 ) {
-
-      push @after_add, sub {
-        my($table, $column) = @_;
-        "ALTER TABLE $table ALTER $column SET NOT NULL";
-      };
-
-    } else {
-
-      push @after_add, sub {
-        my($table, $column) = @_;
-        "UPDATE pg_attribute SET attnotnull = TRUE ".
-        " WHERE attname = '$column' ".
-        " AND attrelid = ( SELECT oid FROM pg_class WHERE relname = '$table' )";
-      };
-
-    }
-
+    $self->type($hashref->{'effective_type'});
   }
 
-  my @r = ();
-  my $table = $self->table_name;
-  my $column = $self->name;
+  push @sql, "ALTER TABLE $table ADD COLUMN ". $self->line($dbh);
 
-  push @r, "ALTER TABLE $table ADD COLUMN ". $self->line($dbh);
+  push @sql, @{ $hashref->{'sql_after'} } if $hashref->{'sql_after'};
 
-  push @r, &{$_}($table, $column) foreach @after_add;
-
-  push @r, "ALTER TABLE $table ADD PRIMARY KEY ( ".
+  push @sql, "ALTER TABLE $table ADD PRIMARY KEY ( ".
              $self->table_obj->primary_key. " )"
     if $self->name eq $self->table_obj->primary_key;
 
   $self->type($real_type) if $real_type;
   $self->null($real_null) if defined $real_null;
 
-  @r;
+  @sql;
 
 }
 
@@ -444,71 +417,42 @@ sub sql_alter_column {
 
   my $driver = $dbh ? _load_driver($dbh) : '';
 
-  my @r = ();
+  my @sql = ();
+
+  my $dbd = "DBIx::DBSchema::DBD::$driver";
+  my $hashref = $dbd->alter_column_callback( $dbh, $table, $self, $new );
 
   # change the name...
 
   # change the type...
 
-  # change nullability from NOT NULL to NULL
-  if ( ! $self->null && $new->null ) {
+  if ( $hashref->{'sql_alter_null' } ) {
 
-    my $alter = "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+    push @sql, $hashref->{'sql_alter_null'};
 
-    if ( $driver eq 'Pg' ) {
+  } else {
 
-      my $pg_server_version = $dbh->{'pg_server_version'};
-      unless ( $pg_server_version =~ /\d/ ) {
-        warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
-        $pg_server_version = 70300;
-      }
-
-      if ( $pg_server_version < 70300 ) {
-        $alter = "UPDATE pg_attribute SET attnotnull = FALSE
-                    WHERE attname = '$name'
-                      AND attrelid = ( SELECT oid FROM pg_class
-                                         WHERE relname = '$table'
-                                     )";
-      }
-
-    }
-
-    push @r, $alter;
-
-  }
-
-  # change nullability from NULL to NOT NULL...
-  # this one could be more complicated, need to set a DEFAULT value and update
-  # the table first...
-  if ( $self->null && ! $new->null ) {
-
-    my $alter = "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
-
-    if ( $driver eq 'Pg' ) {
-
-      my $pg_server_version = $dbh->{'pg_server_version'};
-      unless ( $pg_server_version =~ /\d/ ) {
-        warn "WARNING: no pg_server_version!  Assuming >= 7.3\n";
-        $pg_server_version = 70300;
-      }
-
-      if ( $pg_server_version < 70300 ) {
-        push @r, "UPDATE pg_attribute SET attnotnull = TRUE
-                    WHERE attname = '$name'
-                      AND attrelid = ( SELECT oid FROM pg_class
-                                         WHERE relname = '$table'
-                                     )";
-      }
-
-    }
-
-    push @r, $alter;
+    # change nullability from NOT NULL to NULL
+    if ( ! $self->null && $new->null ) {
   
-  }
+      push @sql, "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+  
+    }
+  
+    # change nullability from NULL to NOT NULL...
+    # this one could be more complicated, need to set a DEFAULT value and update
+    # the table first...
+    if ( $self->null && ! $new->null ) {
+  
+      push @sql, "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
+  
+    }
 
+  }
+  
   # change other stuff...
 
-  @r;
+  @sql;
 
 }
 =item sql_drop_column [ DBH ] 
@@ -538,6 +482,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2006 Ivan Kohler
+Copyright (c) 2007 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

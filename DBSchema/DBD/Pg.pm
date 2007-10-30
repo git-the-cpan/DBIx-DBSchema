@@ -5,7 +5,7 @@ use vars qw($VERSION @ISA %typemap);
 use DBD::Pg 1.32;
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.11';
+$VERSION = '0.12';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 die "DBD::Pg version 1.32 or 1.41 (or later) required--".
@@ -13,8 +13,9 @@ die "DBD::Pg version 1.32 or 1.41 (or later) required--".
   if $DBD::Pg::VERSION != 1.32 && $DBD::Pg::VERSION < 1.41;
 
 %typemap = (
-  'BLOB' => 'BYTEA',
+  'BLOB'           => 'BYTEA',
   'LONG VARBINARY' => 'BYTEA',
+  'TIMESTAMP'      => 'TIMESTAMP WITH TIME ZONE',
 );
 
 =head1 NAME
@@ -154,6 +155,114 @@ END
   $row->{'indisunique'};
 }
 
+sub add_column_callback {
+  my( $proto, $dbh, $table, $column_obj ) = @_;
+  my $name = $column_obj->name;
+
+  my $pg_server_version = $dbh->{'pg_server_version'};
+  my $warning = '';
+  unless ( $pg_server_version =~ /\d/ ) {
+    $warning = "WARNING: no pg_server_version!  Assuming >= 7.3\n";
+    $pg_server_version = 70300;
+  }
+
+  my $hashref = { 'sql_after' => [], };
+
+  if ( $column_obj->type =~ /^(\w*)SERIAL$/i ) {
+
+    $hashref->{'effective_type'} = uc($1).'INT';
+
+    #needs more work for old Pg?
+      
+    my $nextval;
+    warn $warning if $warning;
+    if ( $pg_server_version >= 70300 ) {
+      $nextval = "nextval('public.${table}_${name}_seq'::text)";
+    } else {
+      $nextval = "nextval('${table}_${name}_seq'::text)";
+    }
+
+    push @{ $hashref->{'sql_after'} }, 
+      "ALTER TABLE $table ALTER COLUMN $name SET DEFAULT $nextval",
+      "CREATE SEQUENCE ${table}_${name}_seq",
+      "UPDATE $table SET $name = $nextval WHERE $name IS NULL",
+    ;
+
+  }
+
+  if ( ! $column_obj->null ) {
+    $hashref->{'effective_null'} = 'NULL';
+
+    warn $warning if $warning;
+    if ( $pg_server_version >= 70300 ) {
+
+      push @{ $hashref->{'sql_after'} },
+        "ALTER TABLE $table ALTER $name SET NOT NULL";
+
+    } else {
+
+      push @{ $hashref->{'sql_after'} },
+        "UPDATE pg_attribute SET attnotnull = TRUE ".
+        " WHERE attname = '$name' ".
+        " AND attrelid = ( SELECT oid FROM pg_class WHERE relname = '$table' )";
+
+    }
+
+  }
+
+  $hashref;
+
+}
+
+sub alter_column_callback {
+  my( $proto, $dbh, $table, $old_column, $new_column ) = @_;
+  my $name = $old_column->name;
+
+  my $pg_server_version = $dbh->{'pg_server_version'};
+  my $warning = '';
+  unless ( $pg_server_version =~ /\d/ ) {
+    $warning = "WARNING: no pg_server_version!  Assuming >= 7.3\n";
+    $pg_server_version = 70300;
+  }
+
+  my $hashref = {};
+
+  # change nullability from NOT NULL to NULL
+  if ( ! $old_column->null && $new_column->null ) {
+
+    warn $warning if $warning;
+    if ( $pg_server_version < 70300 ) {
+      $hashref->{'sql_alter_null'} =
+        "UPDATE pg_attribute SET attnotnull = FALSE
+          WHERE attname = '$name'
+            AND attrelid = ( SELECT oid FROM pg_class
+                               WHERE relname = '$table'
+                           )";
+    }
+
+  }
+
+  # change nullability from NULL to NOT NULL...
+  # this one could be more complicated, need to set a DEFAULT value and update
+  # the table first...
+  if ( $old_column->null && ! $new_column->null ) {
+
+    warn $warning if $warning;
+    if ( $pg_server_version < 70300 ) {
+      $hashref->{'sql_alter_null'} =
+        "UPDATE pg_attribute SET attnotnull = TRUE
+           WHERE attname = '$name'
+             AND attrelid = ( SELECT oid FROM pg_class
+                                WHERE relname = '$table'
+                            )";
+    }
+
+  }
+
+  $hashref;
+
+}
+
 =head1 AUTHOR
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
@@ -162,6 +271,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
+Copyright (c) 2007 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

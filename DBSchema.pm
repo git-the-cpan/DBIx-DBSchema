@@ -10,7 +10,7 @@ use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = "0.34";
+$VERSION = "0.35";
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 $DEBUG = 0;
@@ -406,7 +406,7 @@ sub pretty_print {
                       ? "              'using'  => '". $index->using ."',\n"
                       : ''
                   ).
-                  "                   'unique'  => ". $index->_unique .",\n".
+                  "                   'unique'  => ". $index->unique .",\n".
                   "                   'columns' => [ '".
                                               join("', '", @{$index->columns} ).
                                               "' ],\n".
@@ -423,6 +423,9 @@ sub pretty_print {
 =cut
 
 =item pretty_read HASHREF
+
+This method is B<not> recommended.  If you need to load and save your schema
+to a file, see the L</load|load> and L</save|save> methods.
 
 Creates a schema as specified by a data structure such as that created by
 B<pretty_print> method.

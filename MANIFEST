@@ -23,4 +23,3 @@ t/load-pg.t
 t/load-sqlite.t
 t/load-sybase.t
 t/load.t
-META.yml                                 Module meta-data (added by MakeMaker)

@@ -3,7 +3,7 @@ package DBIx::DBSchema::DBD;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 =head1 NAME
 
@@ -143,7 +143,7 @@ Inheriting from DBIx::DBSchema::DBD will provide the default empty string.
 
 sub default_db_catalog { ''; }
 
-=item default_db_catalog
+=item default_db_schema
 
 Returns the default database schema for the DBI table_info command.
 Inheriting from DBIx::DBSchema::DBD will provide the default empty string.
@@ -151,6 +151,60 @@ Inheriting from DBIx::DBSchema::DBD will provide the default empty string.
 =cut
 
 sub default_db_schema { ''; }
+
+=item column_callback DBH TABLE_NAME COLUMN_OBJ
+
+Optional callback for driver-specific overrides to SQL column definitions.
+
+Should return a hash reference, empty for no action, or with one or more of
+the following keys defined:
+
+effective_type - Optional type override used during column creation.
+
+explicit_null - Set true to have the column definition declare NULL columns explicitly
+
+effective_default - Optional default override used during column creation.
+
+effective_local - Optional local override used during column creation.
+
+
+=cut
+
+sub column_callback { {}; }
+
+=item add_column_callback DBH TABLE_NAME COLUMN_OBJ
+
+Optional callback for additional SQL statments to be called when adding columns
+to an existing table.
+
+Should return a hash reference, empty for no action, or with one or more of
+the following keys defined:
+
+effective_type - Optional type override used during column creation.
+
+effective_null - Optional nullability override used during column creation.
+
+sql_after - Array reference of SQL statements to be executed after the column is added.
+
+=cut
+
+sub add_column_callback { {}; }
+
+=item alter_column_callback DBH TABLE_NAME OLD_COLUMN_OBJ NEW_COLUMN_OBJ
+
+Optional callback for overriding the SQL statments to be called when altering
+columns to an existing table.
+
+Should return a hash reference, empty for no action, or with one or more of
+the following keys defined:
+
+sql_alter_null - Alter SQL statment for changing nullability to be used instead of the default
+
+=cut
+
+sub alter_column_callback { {}; }
+
+=cut
 
 =back
 
@@ -179,6 +233,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2005 Ivan Kohler
+Copyright (c) 2007 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

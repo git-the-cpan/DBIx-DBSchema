@@ -1,5 +1,13 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.35 Mon Oct 29 18:58:36 PDT 2007
+        - Fix minor breakage (pretty_print) resulting from Jesse's changes.
+	- Update mysql driver to handle BIGSERIAL columns
+	- Update Column.pm, move all mysql and Pg-specific code to DBD driver
+	  callbacks
+	- Update Table.pm, add local_options
+	- Fix mysql NULL reverse-engineering and updating code
+
 0.34 Sun Aug 19 10:08:51 PDT 2007
         - More work on update schema from Slaven Rezic <srezic@cpan.org>,
           thanks!

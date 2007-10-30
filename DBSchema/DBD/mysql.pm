@@ -4,12 +4,13 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
   'TIMESTAMP'      => 'DATETIME',
   'SERIAL'         => 'INTEGER',
+  'BIGSERIAL'      => 'BIGINT',
   'BOOL'           => 'TINYINT',
   'LONG VARBINARY' => 'LONGBLOB',
 );
@@ -31,6 +32,7 @@ $schema = new_native DBIx::DBSchema $dbh;
 This module implements a MySQL-native driver for DBIx::DBSchema.
 
 =cut
+    use Data::Dumper;
 
 sub columns {
   my($proto, $dbh, $table ) = @_;
@@ -39,13 +41,14 @@ sub columns {
   my $sth = $dbh->prepare("SHOW COLUMNS FROM $table") or die $dbh->errstr;
   $sth->execute or die $sth->errstr;
   my @r = map {
+    #warn Dumper($_);
     $_->{'Type'} =~ /^(\w+)\(?([^)]+)?\)?( \d+)?$/
       or die "Illegal type: ". $_->{'Type'}. "\n";
     my($type, $length) = ($1, $2);
     [
       $_->{'Field'},
       $type,
-      $_->{'Null'},
+      ( $_->{'Null'} =~ /^YES$/i ? 'NULL' : '' ),
       $length,
       $_->{'Default'},
       $_->{'Extra'}
@@ -109,6 +112,48 @@ sub _show_index {
   ( $pkey, \%unique, \%index );
 }
 
+sub column_callback {
+  my( $proto, $dbh, $table, $column_obj ) = @_;
+
+  my $hashref = { 'explicit_null' => 1, };
+
+  $hashref->{'effective_local'} = 'AUTO_INCREMENT'
+    if $column_obj->type =~ /^(\w*)SERIAL$/i;
+
+  if ( $column_obj->default =~ /^(NOW)\(\)$/i
+       && $column_obj->type =~ /^(TIMESTAMP|DATETIME)$/i ) {
+
+    $hashref->{'effective_default'} = 'CURRENT_TIMESTAMP';
+    $hashref->{'effective_type'} = 'TIMESTAMP';
+
+  }
+
+  $hashref;
+
+}
+
+sub alter_column_callback {
+  my( $proto, $dbh, $table, $old_column, $new_column ) = @_;
+  my $old_name = $old_column->name;
+  my $new_def = $new_column->line($dbh);
+
+# this would have been nice, but it appears to be doing too much...
+
+#  return {} if $old_column->line($dbh) eq $new_column->line($dbh);
+#
+#  #{ 'sql_alter' => 
+#  { 'sql_alter_null' => 
+#      "ALTER TABLE $table CHANGE $old_name $new_def",
+#  };
+
+  return {} if $old_column->null eq $new_column->null;
+  { 'sql_alter_null' => 
+      "ALTER TABLE $table MODIFY $new_def",
+  };
+
+
+}
+
 =head1 AUTHOR
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
@@ -117,6 +162,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
+Copyright (c) 2007 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
