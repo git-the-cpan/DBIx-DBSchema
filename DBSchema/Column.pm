@@ -5,7 +5,7 @@ use vars qw($VERSION);
 use Carp;
 use DBIx::DBSchema::_util qw(_load_driver _dbh);
 
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 =head1 NAME
 
@@ -367,7 +367,7 @@ sub sql_add_column {
   my $real_null = undef;
   if ( exists($hashref->{'effective_null'}) ) {
     $real_null = $self->null;
-    $self->type($hashref->{'effective_type'});
+    $self->null($hashref->{'effective_null'});
   }
 
   push @sql, "ALTER TABLE $table ADD COLUMN ". $self->line($dbh);

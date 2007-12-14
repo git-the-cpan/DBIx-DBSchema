@@ -10,7 +10,7 @@ use DBIx::DBSchema::Index;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 $DEBUG = 0;
 
 =head1 NAME
@@ -360,7 +360,7 @@ sub local_options {
   if ( defined($value) ) {
     $self->{local_options} = $value;
   } else {
-    $self->{local_options};
+    defined $self->{local_options} ? $self->{local_options} : '';
   }
 }
 

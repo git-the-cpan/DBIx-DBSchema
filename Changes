@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.36 Thu Dec 13 17:49:35 PST 2007
+        - Patch from ISHIGAKI@cpan.org to suppress unnecessary warnings about
+          undefined local_options, thanks!
+        - fix bug preventing adding new columns as primary keys under Pg
+
 0.35 Mon Oct 29 18:58:36 PDT 2007
         - Fix minor breakage (pretty_print) resulting from Jesse's changes.
 	- Update mysql driver to handle BIGSERIAL columns
