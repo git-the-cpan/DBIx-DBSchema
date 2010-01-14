@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -120,7 +120,7 @@ sub column_callback {
   $hashref->{'effective_local'} = 'AUTO_INCREMENT'
     if $column_obj->type =~ /^(\w*)SERIAL$/i;
 
-  if ( $column_obj->default =~ /^(NOW)\(\)$/i
+  if ( $column_obj->quoted_default =~ /^(NOW)\(\)$/i
        && $column_obj->type =~ /^(TIMESTAMP|DATETIME)$/i ) {
 
     $hashref->{'effective_default'} = 'CURRENT_TIMESTAMP';
@@ -162,7 +162,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007 Freeside Internet Services, Inc.
+Copyright (c) 2007-2010 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

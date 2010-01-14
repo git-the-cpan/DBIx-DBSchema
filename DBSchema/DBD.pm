@@ -3,7 +3,7 @@ package DBIx::DBSchema::DBD;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '0.05';
+$VERSION = '0.07';
 
 =head1 NAME
 
@@ -198,13 +198,38 @@ columns to an existing table.
 Should return a hash reference, empty for no action, or with one or more of
 the following keys defined:
 
-sql_alter_null - Alter SQL statment for changing nullability to be used instead of the default
+sql_alter - Alter SQL statement(s) for changing everything about a column.  Specifying this overrides processing of individual changes (type, nullability, default, etc.).
+
+sql_alter_type - Alter SQL statement(s) for changing type and length (there is no default).
+
+sql_alter_null - Alter SQL statement(s) for changing nullability to be used instead of the default.
 
 =cut
 
 sub alter_column_callback { {}; }
 
+=item column_value_needs_quoting COLUMN_OBJ
+
+Optional callback for determining if a column's default value require quoting.
+Returns true if it does, false otherwise.
+
 =cut
+
+sub column_value_needs_quoting {
+  my($proto, $col) = @_;
+  my $class = ref($proto) || $proto;
+ 
+  # type mapping
+  my %typemap = eval "\%${class}::typemap";
+  my $type = defined( $typemap{uc($col->type)} )
+               ? $typemap{uc($col->type)}
+               : $col->type;
+
+  # false laziness: nicked from FS::Record::_quote
+  $col->default !~ /^\-?\d+(\.\d+)?$/
+    ||    $type =~ /(char|binary|blob|text)$/i;
+
+}
 
 =back
 
@@ -233,7 +258,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2005 Ivan Kohler
-Copyright (c) 2007 Freeside Internet Services, Inc.
+Copyright (c) 2007-2010 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

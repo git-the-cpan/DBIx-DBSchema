@@ -4,13 +4,13 @@ use strict;
 use vars qw($VERSION $DEBUG $errstr);
 use Storable;
 use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
-use DBIx::DBSchema::Table 0.05;
+use DBIx::DBSchema::Table 0.08;
 use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = "0.36";
+$VERSION = "0.38";
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 $DEBUG = 0;
@@ -276,7 +276,6 @@ specified database, will attempt to use generic SQL syntax.
 #gosh, false laziness w/DBSchema::Table::sql_alter_schema
 
 sub sql_update_schema {
-  #my($self, $new, $dbh) = ( shift, shift, _dbh(@_) );
   my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
 
   my @r = ();
@@ -287,8 +286,10 @@ sub sql_update_schema {
   
       warn "$table exists\n" if $DEBUG > 1;
 
-      push @r,
-        $self->table($table)->sql_alter_table( $new->table($table), $dbh );
+      push @r, $self->table($table)->sql_alter_table( $new->table($table),
+                                                      $dbh,
+                                                      $opt
+                                                    );
 
     } else {
   
@@ -370,7 +371,12 @@ sub pretty_print {
                          "'". $table->column($_)->type. "', ".
                          "'". $table->column($_)->null. "', ". 
                          "'". $table->column($_)->length. "', ".
-                         "'". $table->column($_)->default. "', ".
+
+                         ( ref($table->column($_)->default)
+                             ? "\\'". ${ $table->column($_)->default }. "'"
+                             : "'". $table->column($_)->default. "'"
+                         ).', '.
+
                          "'". $table->column($_)->local. "',\n"
                        } $table->columns
           ).
@@ -516,7 +522,7 @@ items/projects below under BUGS.
 
 Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007 Freeside Internet Services, Inc.
+Copyright (c) 2007-2010 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -527,9 +533,7 @@ Multiple primary keys are not yet supported.
 
 Foreign keys and other constraints are not yet supported.
 
-Eventually it would be nice to have additional transformations (deleted,
-modified columns).  sql_update_schema doesn't deal with deleted or modified
-columns yet.
+sql_update_schema doesn't deal with deleted columns yet.
 
 Need to port and test with additional databases
 

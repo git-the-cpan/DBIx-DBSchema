@@ -3,9 +3,9 @@ package DBIx::DBSchema::Column;
 use strict;
 use vars qw($VERSION);
 use Carp;
-use DBIx::DBSchema::_util qw(_load_driver _dbh);
+use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
 
-$VERSION = '0.11';
+$VERSION = '0.14';
 
 =head1 NAME
 
@@ -72,7 +72,7 @@ rules for truth, with one exception: `NOT NULL' is false).  B<length> is the
 SQL length of the column.  B<default> is the default value of the column.
 B<local> is reserved for database-specific information.
 
-Note: If you pass a scalar reference as the B<default> rather than a scalar value, it will be dereferenced and quoting will be forced off.  This can be used to pass SQL functions such as C<$now()> or explicit empty strings as C<''> as
+Note: If you pass a scalar reference as the B<default> rather than a scalar value, it will be dereferenced and quoting will be forced off.  This can be used to pass SQL functions such as C<now()> or explicit empty strings as C<''> as
 defaults.
 
 =cut
@@ -248,44 +248,23 @@ sub line {
   my($self, $dbh) = ( shift, _dbh(@_) );
 
   my $driver = $dbh ? _load_driver($dbh) : '';
+  my $dbd = "DBIx::DBSchema::DBD::$driver";
 
   ##
   # type mapping
   ## 
 
   my %typemap;
-  %typemap = eval "\%DBIx::DBSchema::DBD::${driver}::typemap" if $driver;
+  %typemap = eval "\%${dbd}::typemap" if $driver;
   my $type = defined( $typemap{uc($self->type)} )
     ? $typemap{uc($self->type)}
     : $self->type;
 
   ##
-  # set default for the callback...
-  ##
-
-  my $default;
-  my $orig_default = $self->default;
-  if ( defined($self->default) && !ref($self->default) && $self->default ne ''
-       && ref($dbh)
-       # false laziness: nicked from FS::Record::_quote
-       && ( $self->default !~ /^\-?\d+(\.\d+)?$/
-            || $type =~ /(char|binary|blob|text)$/i
-          )
-  ) {
-    $default = $dbh->quote($self->default);
-  } else {
-    $default = ref($self->default) ? ${$self->default} : $self->default;
-  }
-  $self->default($default);
-
-  ##
   # callback into the database-specific driver
   ##
 
-  my $dbd = "DBIx::DBSchema::DBD::$driver";
   my $hashref = $dbd->column_callback( $dbh, $self->table_name, $self );
-
-  $self->default($orig_default);
 
   $type = $hashref->{'effective_type'}
     if $hashref->{'effective_type'};
@@ -298,8 +277,8 @@ sub line {
 
   $null =~ s/^NULL$// unless $hashref->{'explicit_null'};
 
-  $default = $hashref->{'effective_default'}
-    if $hashref->{'effective_default'};
+  my $default = $hashref->{'effective_default'} || $self->quoted_default($dbh);
+  $default = "DEFAULT $default" if $default ne '';
 
   my $local = $self->local;
   $local = $hashref->{'effective_local'}
@@ -316,12 +295,33 @@ sub line {
              : ''
            ),
     $null,
-    ( ( defined($default) && $default ne '' )
-      ? 'DEFAULT '. $default
-      : ''
-    ),
+    $default,
     ( defined($local) ? $local : ''),
   );
+
+}
+
+=item quoted_default DATABASE_HANDLE
+
+Returns this column's default value quoted for the database.
+
+=cut
+
+sub quoted_default {
+  my($self, $dbh) = @_;
+  my $driver = $dbh ? _load_driver($dbh) : '';
+
+  return ${$self->default} if ref($self->default);
+
+  my $dbd = "DBIx::DBSchema::DBD::$driver";
+
+  return $dbh->quote($self->default)
+    if defined($self->default)
+    && $self->default ne ''
+    && ref($dbh)
+    && $dbd->column_value_needs_quoting($self);
+  
+  return $self->default;
 
 }
 
@@ -390,24 +390,20 @@ sub sql_add_column {
 Returns a list of SQL statements to alter this column so that it is identical
 to the provided prototype column, also a DBIx::DBSchema::Column object.
 
- #Optionally, the data source can be specified by passing an open DBI database
- #handle, or by passing the DBI data source name, username and password.  
- #
- #If passed a DBI data source (or handle) such as `DBI:Pg:dbname=database', will
- #use PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
- #applicable) may also be supported in the future.
- #
- #If not passed a data source (or handle), or if there is no driver for the
- #specified database, will attempt to use generic SQL syntax.
+Optionally, the data source can be specified by passing an open DBI database
+handle, or by passing the DBI data source name, username and password.  
 
+If passed a DBI data source (or handle) such as `DBI:Pg:dbname=database', will
+use PostgreSQL-specific syntax.  Non-standard syntax for other engines (if
+applicable) may also be supported in the future.
 
-Or should, someday.  Right now it knows how to change NOT NULL into NULL and
-vice-versa.
+If not passed a data source (or handle), or if there is no driver for the
+specified database, will attempt to use generic SQL syntax.
 
 =cut
 
 sub sql_alter_column {
-  my( $self, $new, $dbh ) = ( shift, shift, _dbh(@_) );
+  my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
 
   my $table = $self->table_name;
   die "$self: this column is not assigned to a table"
@@ -422,39 +418,73 @@ sub sql_alter_column {
   my $dbd = "DBIx::DBSchema::DBD::$driver";
   my $hashref = $dbd->alter_column_callback( $dbh, $table, $self, $new );
 
-  # change the name...
+  if ( $hashref->{'sql_alter'} ) {
 
-  # change the type...
-
-  if ( $hashref->{'sql_alter_null' } ) {
-
-    push @sql, $hashref->{'sql_alter_null'};
+    push @sql, $hashref->{'sql_alter'};
 
   } else {
 
-    # change nullability from NOT NULL to NULL
-    if ( ! $self->null && $new->null ) {
-  
-      push @sql, "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
-  
-    }
-  
-    # change nullability from NULL to NOT NULL...
-    # this one could be more complicated, need to set a DEFAULT value and update
-    # the table first...
-    if ( $self->null && ! $new->null ) {
-  
-      push @sql, "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
-  
+    # change the name...
+    # not yet implemented.  how do we tell which old column it was?
+
+    # change the type...
+    if ( $hashref->{'sql_alter_type'} ) {
+      push @sql, $hashref->{'sql_alter_type'};
     }
 
+    # change nullability...
+
+    if ( $hashref->{'sql_alter_null'} ) {
+
+      push @sql, $hashref->{'sql_alter_null'};
+
+    } else {
+
+      # change nullability from NOT NULL to NULL
+      if ( ! $self->null && $new->null ) {
+    
+        push @sql, "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+    
+      }
+    
+      # change nullability from NULL to NOT NULL...
+      # this one could be more complicated, need to set a DEFAULT value and update
+      # the table first...
+      if ( $self->null && ! $new->null ) {
+    
+        push @sql, "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
+    
+      }
+
+    }
+
+    # change default
+    my $old_default = $self->quoted_default($dbh);
+    my $new_default = $new->quoted_default($dbh);
+    if ( $old_default ne $new_default ) {
+
+      my $alter = "ALTER TABLE $table ALTER COLUMN $name";
+
+      if ( $new_default ne '' ) {
+        #warn "changing from $old_default to $new_default\n";
+        push @sql, "$alter SET DEFAULT $new_default";
+      } elsif ( $old_default !~ /^nextval/i ) { #Pg-specific :(
+        push @sql, "$alter DROP DEFAULT";
+
+        push @sql, "UPDATE TABLE $table SET $name = NULL WHERE $name = ''"
+          if $opt->{'nullify_default'} && $old_default eq "''" && $new->null;
+      }
+
+    }
+
+    # change other stuff... (what next?)
+
   }
-  
-  # change other stuff...
 
   @sql;
 
 }
+
 =item sql_drop_column [ DBH ] 
 
 Returns a list of SQL statements to drop this column from an existing table.
@@ -482,7 +512,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2006 Ivan Kohler
-Copyright (c) 2007 Freeside Internet Services, Inc.
+Copyright (c) 2007-2010 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -494,8 +524,10 @@ The new() method should warn that
 
 Better documentation is needed for sql_add_column
 
-line() and sql_add_column() hav database-specific foo that should be abstracted
-into the DBIx::DBSchema:DBD:: modules.
+sql_alter_column() has database-specific foo that should be abstracted info
+DBIx::DBSchema::DBD::Pg
+
+nullify_default option should be documented
 
 =head1 SEE ALSO
 

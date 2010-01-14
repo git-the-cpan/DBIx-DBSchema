@@ -5,7 +5,7 @@ use vars qw($VERSION @ISA %typemap);
 use DBD::Pg 1.32;
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.12';
+$VERSION = '0.17';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 die "DBD::Pg version 1.32 or 1.41 (or later) required--".
@@ -52,17 +52,8 @@ END
 
   map {
 
-    my $default = '';
-    if ( $_->{atthasdef} ) {
-      my $attnum = $_->{attnum};
-      my $d_sth = $dbh->prepare(<<END) or die $dbh->errstr;
-        SELECT substring(d.adsrc for 128) FROM pg_attrdef d, pg_class c
-        WHERE c.relname = '$table' AND c.oid = d.adrelid AND d.adnum = $attnum
-END
-      $d_sth->execute or die $d_sth->errstr;
-
-      $default = $d_sth->fetchrow_arrayref->[0];
-    };
+    my $type = $_->{'typname'};
+    $type = 'char' if $type eq 'bpchar';
 
     my $len = '';
     if ( $_->{attlen} == -1 && $_->{atttypmod} != -1 
@@ -73,8 +64,32 @@ END
       }
     }
 
-    my $type = $_->{'typname'};
-    $type = 'char' if $type eq 'bpchar';
+    my $default = '';
+    if ( $_->{atthasdef} ) {
+      my $attnum = $_->{attnum};
+      my $d_sth = $dbh->prepare(<<END) or die $dbh->errstr;
+        SELECT substring(d.adsrc for 128) FROM pg_attrdef d, pg_class c
+        WHERE c.relname = '$table' AND c.oid = d.adrelid AND d.adnum = $attnum
+END
+      $d_sth->execute or die $d_sth->errstr;
+
+      $default = $d_sth->fetchrow_arrayref->[0];
+
+      if ( _type_needs_quoting($type) ) {
+        $default =~ s/::([\w ]+)$//; #save typecast info?
+        if ( $default =~ /^'(.*)'$/ ) {
+          $default = $1;
+          $default = \"''" if $default eq '';
+        } else {
+          my $value = $default;
+          $default = \$value;
+        }
+      } elsif ( $default =~ /^[a-z]/i ) { #sloppy, but it'll do
+        my $value = $default;
+        $default = \$value;
+      }
+
+    }
 
     [
       $_->{'attname'},
@@ -177,7 +192,8 @@ sub add_column_callback {
     my $nextval;
     warn $warning if $warning;
     if ( $pg_server_version >= 70300 ) {
-      $nextval = "nextval('public.${table}_${name}_seq'::text)";
+      my $db_schema  = default_db_schema();
+      $nextval = "nextval('$db_schema.${table}_${name}_seq'::text)";
     } else {
       $nextval = "nextval('${table}_${name}_seq'::text)";
     }
@@ -218,6 +234,21 @@ sub alter_column_callback {
   my( $proto, $dbh, $table, $old_column, $new_column ) = @_;
   my $name = $old_column->name;
 
+  my %canonical = (
+    'SMALLINT'  => 'INT2',
+    'INT'       => 'INT4',
+    'BIGINT'    => 'INT8',
+    'SERIAL'    => 'INT4',
+    'BIGSERIAL' => 'INT8',
+    'DECIMAL'   => 'NUMERIC',
+    'REAL'      => 'FLOAT4',
+    'BLOB'      => 'BYTEA',
+    'TIMESTAMP' => 'TIMESTAMPTZ',
+  );
+  foreach ($old_column, $new_column) {
+    $_->type($canonical{uc($_->type)}) if $canonical{uc($_->type)};
+  }
+
   my $pg_server_version = $dbh->{'pg_server_version'};
   my $warning = '';
   unless ( $pg_server_version =~ /\d/ ) {
@@ -226,6 +257,30 @@ sub alter_column_callback {
   }
 
   my $hashref = {};
+
+  #change type
+  if ( ( $canonical{uc($old_column->type)} || uc($old_column->type) )
+         ne ( $canonical{uc($new_column->type)} || uc($new_column->type) )
+       || $old_column->length ne $new_column->length
+     )
+  {
+
+    warn $warning if $warning;
+    if ( $pg_server_version >= 80000 ) {
+
+      $hashref->{'sql_alter_type'} =
+        "ALTER TABLE $table ALTER COLUMN ". $new_column->name.
+        " TYPE ". $new_column->type.
+        ( ( defined($new_column->length) && $new_column->length )
+              ? '('.$new_column->length.')'
+              : ''
+        )
+
+    } else {
+      warn "WARNING: can't yet change column types for Pg < version 8\n";
+    }
+
+  }
 
   # change nullability from NOT NULL to NULL
   if ( ! $old_column->null && $new_column->null ) {
@@ -263,6 +318,28 @@ sub alter_column_callback {
 
 }
 
+sub column_value_needs_quoting {
+  my($proto, $col) = @_;
+  _type_needs_quoting($col->type);
+}
+
+sub _type_needs_quoting {
+  my $type = shift;
+  $type !~ m{^(
+               int(?:2|4|8)?
+             | smallint
+             | integer
+             | bigint
+             | (?:numeric|decimal)(?:\(\d+(?:\s*\,\s*\d+\))?)?
+             | real
+             | double\s+precision
+             | float(?:\(\d+\))?
+             | serial(?:4|8)?
+             | bigserial
+             )$}ix;
+}
+
+
 =head1 AUTHOR
 
 Ivan Kohler <ivan-dbix-dbschema@420.am>
@@ -271,7 +348,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007 Freeside Internet Services, Inc.
+Copyright (c) 2009-2010 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

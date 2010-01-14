@@ -4,13 +4,13 @@ use strict;
 use vars qw($VERSION $DEBUG %create_params);
 use Carp;
 #use Exporter;
-use DBIx::DBSchema::_util qw(_load_driver _dbh);
-use DBIx::DBSchema::Column 0.07;
+use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
+use DBIx::DBSchema::Column 0.14;
 use DBIx::DBSchema::Index;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 $DEBUG = 0;
 
 =head1 NAME
@@ -617,7 +617,7 @@ specified database, will attempt to use generic SQL syntax.
 #gosh, false laziness w/DBSchema::sql_update_schema
 
 sub sql_alter_table {
-  my( $self, $new, $dbh ) = ( shift, shift, _dbh(@_) );
+  my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
 
   my $driver = _load_driver($dbh);
 
@@ -636,23 +636,20 @@ sub sql_alter_table {
     if ( $self->column($column) )  {
 
       warn "  $table.$column exists\n" if $DEBUG > 1;
-
-      push @r,
-        $self->column($column)->sql_alter_column( $new->column($column), $dbh );
+      push @r, $self->column($column)->sql_alter_column( $new->column($column),
+                                                         $dbh,
+                                                         $opt,
+                                                       );
 
     } else {
   
       warn "column $table.$column does not exist.\n" if $DEBUG > 1;
-
-      push @r,
-        $new->column($column)->sql_add_column( $dbh );
+      push @r, $new->column($column)->sql_add_column( $dbh );
   
     }
   
   }
 
-  #should eventually drop columns not in $new...
-  
   ###
   # indices
   ###
@@ -764,7 +761,7 @@ with no indices.
 
 Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007 Freeside Internet Services, Inc.
+Copyright (c) 2007-2010 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -781,8 +778,6 @@ sql_create_table() may change or destroy the object's data.  If you need to use
 the object after sql_create_table, make a copy beforehand.
 
 Some of the logic in new_odbc might be better abstracted into Column.pm etc.
-
-sql_alter_table ought to drop columns not in $new
 
 Add methods to get and set specific indices, by name? (like column COLUMN_NAME)
 
