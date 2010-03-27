@@ -461,7 +461,12 @@ sub sql_alter_column {
     # change default
     my $old_default = $self->quoted_default($dbh);
     my $new_default = $new->quoted_default($dbh);
-    if ( $old_default ne $new_default ) {
+    if ( $old_default ne $new_default
+         && ( uc($old_default) ne 'NOW()' || uc($new_default) ne 'NOW()' )
+       )
+    {
+
+      #warn "old default: $old_default / new default: $new_default\n";
 
       my $alter = "ALTER TABLE $table ALTER COLUMN $name";
 

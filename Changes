@@ -1,5 +1,11 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.39 Fri Mar 26 20:24:58 PDT 2010
+        - mysql: TEXT->LONGTEXT
+        - mysql: when reverse engineering, transform a default of
+          CURRENT_TIMESTAMP into the more common NOW()
+        - mysql: fix reverse-engineering of empty string default
+
 0.38 Thu Jan 14 15:26:13 PST 2010
         - Bump version number for ->quoted_default availability & default
           reverse-engineering changes

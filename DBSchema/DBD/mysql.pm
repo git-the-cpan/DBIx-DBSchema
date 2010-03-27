@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -13,6 +13,7 @@ $VERSION = '0.07';
   'BIGSERIAL'      => 'BIGINT',
   'BOOL'           => 'TINYINT',
   'LONG VARBINARY' => 'LONGBLOB',
+  'TEXT'           => 'LONGTEXT',
 );
 
 =head1 NAME
@@ -45,12 +46,22 @@ sub columns {
     $_->{'Type'} =~ /^(\w+)\(?([^)]+)?\)?( \d+)?$/
       or die "Illegal type: ". $_->{'Type'}. "\n";
     my($type, $length) = ($1, $2);
+
+    my $default = $_->{'Default'};
+    if ( defined($default) ) {
+      $default = \"''"    if $default eq '';
+      $default = \0       if $default eq '0';
+      $default = \'NOW()' if uc($default) eq 'CURRENT_TIMESTAMP';
+    } else {
+      $default = '';
+    }
+
     [
       $_->{'Field'},
       $type,
       ( $_->{'Null'} =~ /^YES$/i ? 'NULL' : '' ),
       $length,
-      $_->{'Default'},
+      $default,
       $_->{'Extra'}
     ]
   } @{ $sth->fetchall_arrayref( {} ) };
