@@ -4,7 +4,7 @@ use strict;
 use vars qw($VERSION @ISA %typemap);
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.08';
+$VERSION = '0.09';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 %typemap = (
@@ -148,21 +148,45 @@ sub alter_column_callback {
   my $old_name = $old_column->name;
   my $new_def = $new_column->line($dbh);
 
-# this would have been nice, but it appears to be doing too much...
+  my $hashref = {};
 
-#  return {} if $old_column->line($dbh) eq $new_column->line($dbh);
-#
-#  #{ 'sql_alter' => 
-#  { 'sql_alter_null' => 
-#      "ALTER TABLE $table CHANGE $old_name $new_def",
-#  };
+  my %canonical = (
+    'INTEGER'          => 'INT',
+    'SERIAL'           => 'INT',
+    'BIGSERIAL'        => 'BIGINT',
+    'REAL'             => 'DOUBLE', #'FLOAT',
+    'DOUBLE PRECISION' => 'DOUBLE',
+  );
+  foreach ($old_column, $new_column) {
+    $_->type($canonical{uc($_->type)}) if $canonical{uc($_->type)};
+  }
 
-  return {} if $old_column->null eq $new_column->null;
-  { 'sql_alter_null' => 
-      "ALTER TABLE $table MODIFY $new_def",
-  };
+  my %canonical_length = (
+    'INT'      => 11,
+    'BIGINT'   => 20,
+    'DECIMAL' => '10,0',
+  );
+  $new_column->length( $canonical_length{uc($new_column->type)} )
+    if $canonical_length{uc($new_column->type)}
+    && ($new_column->length||'') eq '';
 
+  #change type/length
+  if ( uc($old_column->type) ne uc($new_column->type)
+       || ($old_column->length||'') ne ($new_column->length||'')
+     )
+  {
+    my $old_def = $old_column->line($dbh);
+    $hashref->{'sql_alter_type'} =
+      "ALTER TABLE $table CHANGE $old_name $new_def";
+  }
 
+  #change nullability
+  if ( $old_column->null ne $new_column->null ) {
+    $hashref->{'sql_alter_null'} =
+      "ALTER TABLE $table MODIFY $new_def";
+  }
+
+  $hashref;
 }
 
 =head1 AUTHOR
@@ -173,7 +197,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007-2010 Freeside Internet Services, Inc.
+Copyright (c) 2007-2011 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

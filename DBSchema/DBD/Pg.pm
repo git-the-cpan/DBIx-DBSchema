@@ -5,7 +5,7 @@ use vars qw($VERSION @ISA %typemap);
 use DBD::Pg 1.32;
 use DBIx::DBSchema::DBD;
 
-$VERSION = '0.17';
+$VERSION = '0.18';
 @ISA = qw(DBIx::DBSchema::DBD);
 
 die "DBD::Pg version 1.32 or 1.41 (or later) required--".
@@ -235,15 +235,16 @@ sub alter_column_callback {
   my $name = $old_column->name;
 
   my %canonical = (
-    'SMALLINT'  => 'INT2',
-    'INT'       => 'INT4',
-    'BIGINT'    => 'INT8',
-    'SERIAL'    => 'INT4',
-    'BIGSERIAL' => 'INT8',
-    'DECIMAL'   => 'NUMERIC',
-    'REAL'      => 'FLOAT4',
-    'BLOB'      => 'BYTEA',
-    'TIMESTAMP' => 'TIMESTAMPTZ',
+    'SMALLINT'         => 'INT2',
+    'INT'              => 'INT4',
+    'BIGINT'           => 'INT8',
+    'SERIAL'           => 'INT4',
+    'BIGSERIAL'        => 'INT8',
+    'DECIMAL'          => 'NUMERIC',
+    'REAL'             => 'FLOAT4',
+    'DOUBLE PRECISION' => 'FLOAT8',
+    'BLOB'             => 'BYTEA',
+    'TIMESTAMP'        => 'TIMESTAMPTZ',
   );
   foreach ($old_column, $new_column) {
     $_->type($canonical{uc($_->type)}) if $canonical{uc($_->type)};

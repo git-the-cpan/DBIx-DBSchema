@@ -10,7 +10,7 @@ use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ColGroup::Unique;
 use DBIx::DBSchema::ColGroup::Index;
 
-$VERSION = "0.39";
+$VERSION = "0.40";
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 $DEBUG = 0;
@@ -250,7 +250,7 @@ with B<drop_tables> set true before all other arguments, it will also drop
 tables.
 
 See L<DBIx::DBSchema::Table/sql_alter_table>,
-L<DBIx::DBSchema::Column/sql_add_coumn> and
+L<DBIx::DBSchema::Column/sql_add_column> and
 L<DBIx::DBSchema::Column/sql_alter_column> for additional specifics and
 limitations.
 

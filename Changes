@@ -1,5 +1,10 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.40 Sat Dec 17 17:03:51 PST 2011
+        - doc: sql_update_schema link to sql_add_column misspelled
+        - Pg: fix mapping for DOUBLE PRECISION type to avoid needless alter cols
+        - mysql: implement altering column types & lengths
+
 0.39 Fri Mar 26 20:24:58 PDT 2010
         - mysql: TEXT->LONGTEXT
         - mysql: when reverse engineering, transform a default of
