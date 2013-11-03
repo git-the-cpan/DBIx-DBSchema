@@ -177,7 +177,7 @@ sub alter_column_callback {
   {
     my $old_def = $old_column->line($dbh);
     $hashref->{'sql_alter_type'} =
-      "ALTER TABLE $table CHANGE $old_name $new_def";
+      "CHANGE $old_name $new_def";
   }
 
   #change nullability
@@ -197,7 +197,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007-2011 Freeside Internet Services, Inc.
+Copyright (c) 2007-2013 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

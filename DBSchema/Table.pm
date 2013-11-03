@@ -1,17 +1,14 @@
 package DBIx::DBSchema::Table;
 
 use strict;
-use vars qw($VERSION $DEBUG %create_params);
 use Carp;
-#use Exporter;
 use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
 use DBIx::DBSchema::Column 0.14;
 use DBIx::DBSchema::Index;
-use DBIx::DBSchema::ColGroup::Unique;
-use DBIx::DBSchema::ColGroup::Index;
+use DBIx::DBSchema::ForeignKey;
 
-$VERSION = '0.08';
-$DEBUG = 0;
+our $VERSION = '0.09';
+our $DEBUG = 0;
 
 =head1 NAME
 
@@ -24,12 +21,13 @@ DBIx::DBSchema::Table - Table objects
   #new style (preferred), pass a hashref of parameters
   $table = new DBIx::DBSchema::Table (
     {
-      name        => "table_name",
-      primary_key => "primary_key",
-      columns     => \@dbix_dbschema_column_objects,
+      name         => "table_name",
+      primary_key  => "primary_key",
+      columns      => \@dbix_dbschema_column_objects,
       #deprecated# unique      => $dbix_dbschema_colgroup_unique_object,
       #deprecated# 'index'     => $dbix_dbschema_colgroup_index_object,
-      indices     => \@dbix_dbschema_index_objects,
+      indices      => \@dbix_dbschema_index_objects,
+      foreign_keys => \@dbix_dbschema_foreign_key_objects,
     }
   );
 
@@ -92,24 +90,24 @@ hash reference of named parameters.
     columns       => COLUMNS,
     indices       => INDICES,
     local_options => OPTIONS,
-    #deprecated# unique => UNIQUE,
-    #deprecated# index  => INDEX,
   }
 
-TABLE_NAME is the name of the table.  PRIMARY_KEY is the primary key (may be
-empty).  COLUMNS is a reference to an array of DBIx::DBSchema::Column objects
-(see L<DBIx::DBSchema::Column>).  INDICES is a reference to an array of 
-DBIx::DBSchema::Index objects (see L<DBIx::DBSchema::Index>), or a hash
-reference of index names (keys) and DBIx::DBSchema::Index objects (values).
+TABLE_NAME is the name of the table.
+
+PRIMARY_KEY is the primary key (may be empty).
+
+COLUMNS is a reference to an array of DBIx::DBSchema::Column objects
+(see L<DBIx::DBSchema::Column>).
+
+INDICES is a reference to an array of DBIx::DBSchema::Index objects
+(see L<DBIx::DBSchema::Index>), or a hash reference of index names (keys) and
+DBIx::DBSchema::Index objects (values).
+
+FOREIGN_KEYS is a references to an array of DBIx::DBSchema::ForeignKey objects
+(see L<DBIx::DBSchema::ForeignKey>).
+
 OPTIONS is a scalar of database-specific table options, such as "WITHOUT OIDS"
 for Pg or "TYPE=InnoDB" for mysql.
-
-Deprecated options:
-
-UNIQUE was a DBIx::DBSchema::ColGroup::Unique object (see
-L<DBIx::DBSchema::ColGroup::Unique>).  INDEX was a
-DBIx::DBSchema::ColGroup::Index object (see
-L<DBIx::DBSchema::ColGroup::Index>).
 
 =cut
 
@@ -126,6 +124,8 @@ sub new {
 
     $self->{indices} = { map { $_->name, $_ } @{$self->{indices}} }
        if ref($self->{indices}) eq 'ARRAY';
+
+    $self->{foreign_keys} ||= [];
 
   } else {
 
@@ -145,6 +145,7 @@ sub new {
       'index'        => $index,
       'columns'      => \%columns,
       'column_order' => \@column_order,
+      'foreign_keys' => [],
     };
 
   }
@@ -175,7 +176,7 @@ have to have ODBC installed or connect to the database via ODBC.
 
 =cut
 
-%create_params = (
+our %create_params = (
 #  undef             => sub { '' },
   ''                => sub { '' },
   'max length'      => sub { $_[0]->{PRECISION}->[$_[1]]; },
@@ -235,19 +236,7 @@ sub new_odbc {
     
     ],
 
-    #old-style indices
-    #DBIx::DBSchema::ColGroup::Unique->new(
-    #  $driver
-    #   ? [values %{eval "DBIx::DBSchema::DBD::$driver->unique(\$dbh, \$name)"}]
-    #   : []
-    #),
-    #DBIx::DBSchema::ColGroup::Index->new(
-    #  $driver
-    #  ? [ values %{eval "DBIx::DBSchema::DBD::$driver->index(\$dbh, \$name)"} ]
-    #  : []
-    #),
-
-    #new-style indices
+    #indices
     'indices' => { map { my $indexname = $_;
                          $indexname =>
                            DBIx::DBSchema::Index->new($indices_hr->{$indexname})
@@ -272,6 +261,9 @@ sub new_native {
   my( $proto, $dbh, $name) = @_;
   my $driver = _load_driver($dbh);
 
+  my $primary_key =
+    scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
+
   my $indices_hr =
   ( $driver
       ? eval "DBIx::DBSchema::DBD::$driver->indices(\$dbh, \$name)"
@@ -279,29 +271,26 @@ sub new_native {
   );
 
   $proto->new({
-    'name'        => $name,
-    'primary_key' => scalar(eval "DBIx::DBSchema::DBD::$driver->primary_key(\$dbh, \$name)"),
-    'columns'     => [
-    
+    'name'         => $name,
+    'primary_key'  => $primary_key,
+
+    'columns'      => [
       map DBIx::DBSchema::Column->new( @{$_} ),
           eval "DBIx::DBSchema::DBD::$driver->columns(\$dbh, \$name)"
     ],
 
-    #old-style indices
-    #DBIx::DBSchema::ColGroup::Unique->new(
-    #  [ values %{eval "DBIx::DBSchema::DBD::$driver->unique(\$dbh, \$name)"} ]
-    #),
-    #DBIx::DBSchema::ColGroup::Index->new(
-    #  [ values %{eval "DBIx::DBSchema::DBD::$driver->index(\$dbh, \$name)"} ]
-    #),
-    
-    #new-style indices
     'indices' => { map { my $indexname = $_;
                          $indexname =>
                            DBIx::DBSchema::Index->new($indices_hr->{$indexname})
                        } 
                        keys %$indices_hr
                  },
+
+    'foreign_keys' => [
+      map DBIx::DBSchema::ForeignKey->new( $_ ),
+          eval "DBIx::DBSchema::DBD::$driver->constraints(\$dbh, \$name)"
+    ],
+
 
   });
 }
@@ -385,66 +374,6 @@ sub primary_key {
   }
 }
 
-=item unique [ UNIQUE ]
-
-This method is deprecated and included for backwards-compatibility only.
-See L</indices> for the current method to access unique and non-unique index
-objects.
-
-Returns or sets the DBIx::DBSchema::ColGroup::Unique object.
-
-=cut
-
-sub unique {
-    my $self = shift;
-
-    carp ref($self) . "->unique method is deprecated; see ->indices";
-    #croak ref($self). "->unique method is deprecated; see ->indices";
-
-    $self->_unique(@_);
-}
-
-sub _unique {
-
-  my ($self,$value)=@_;
-
-  if ( defined($value) ) {
-    $self->{unique} = $value;
-  } else {
-    $self->{unique};
-  }
-}
-
-=item index [ INDEX ]
-
-This method is deprecated and included for backwards-compatibility only.
-See L</indices> for the current method to access unique and non-unique index
-objects.
-
-Returns or sets the DBIx::DBSchema::ColGroup::Index object.
-
-=cut
-
-sub index { 
-  my $self = shift;
-
-  carp ref($self). "->index method is deprecated; see ->indices";
-  #croak ref($self). "->index method is deprecated; see ->indices";
-
-  $self->_index(@_);
-}
-
-
-sub _index {
-  my($self,$value)=@_;
-
-  if ( defined($value) ) {
-    $self->{'index'} = $value;
-  } else {
-    $self->{'index'};
-  }
-}
-
 =item columns
 
 Returns a list consisting of the names of all columns.
@@ -470,7 +399,7 @@ sub column {
   $self->{'columns'}->{$column};
 }
 
-=item indices COLUMN_NAME
+=item indices
 
 Returns a list of key-value pairs suitable for assigning to a hash.  Keys are
 index names, and values are index objects (see L<DBIx::DBSchema::Index>).
@@ -545,6 +474,8 @@ sub sql_create_table {
 
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
     if $self->primary_key && ! grep /PRIMARY KEY/i, @columns;
+
+  push @columns, $self->foreign_keys_sql;
 
   my $indexnum = 1;
 
@@ -623,6 +554,7 @@ sub sql_alter_table {
 
   my $table = $self->name;
 
+  my @at = ();
   my @r = ();
   my @r_later = ();
   my $tempnum = 1;
@@ -634,17 +566,22 @@ sub sql_alter_table {
   foreach my $column ( $new->columns ) {
 
     if ( $self->column($column) )  {
-
       warn "  $table.$column exists\n" if $DEBUG > 1;
-      push @r, $self->column($column)->sql_alter_column( $new->column($column),
-                                                         $dbh,
-                                                         $opt,
-                                                       );
+
+      my ($alter_table, $sql) = 
+        $self->column($column)->sql_alter_column( $new->column($column),
+                                                  $dbh,
+                                                  $opt,
+                                                );
+      push @at, @$alter_table;
+      push @r, @$sql;
 
     } else {
-  
       warn "column $table.$column does not exist.\n" if $DEBUG > 1;
-      push @r, $new->column($column)->sql_add_column( $dbh );
+
+      my ($alter_table, $sql) = $new->column($column)->sql_add_column( $dbh );
+      push @at, @$alter_table;
+      push @r, @$sql;
   
     }
   
@@ -715,14 +652,29 @@ sub sql_alter_table {
 
     warn "column $table.$column should be dropped.\n" if $DEBUG;
 
-    push @r, $self->column($column)->sql_drop_column( $dbh );
+    push @at, $self->column($column)->sql_drop_column( $dbh );
 
   }
+
+  ###
+  # foreign keys (add)
+  ###
+
+  foreach my $foreign_key ( $new->foreign_keys ) {
+
+    next if grep $foreign_key->cmp($_), $self->foreign_keys;
+
+    push @at, 'ADD '. $foreign_key->sql_foreign_key;
+  }
+
+  # XXX foreign keys modify / drop
   
   ###
   # return the statements
   ###
-  
+
+  unshift @r, "ALTER TABLE $table ". join(', ', @at) if @at;
+
   push @r, @r_later;
 
   warn join('', map "$_\n", @r)
@@ -739,6 +691,29 @@ sub sql_drop_table {
 
   ("DROP TABLE $name");
 }
+
+=item foreign_keys_sql
+
+=cut
+
+sub foreign_keys_sql {
+  my $self = shift;
+  map $_->sql_foreign_key, $self->foreign_keys;
+}
+
+=item foreign_keys
+
+Returns a list of foreign keys (DBIx::DBSchema::ForeignKey objects).
+
+=cut
+
+sub foreign_keys {
+  my $self = shift;
+  exists( $self->{'foreign_keys'} )
+    ? @{ $self->{'foreign_keys'} }
+    : ();
+}
+
 
 sub _null_sth {
   my($dbh, $table) = @_;
@@ -761,7 +736,7 @@ with no indices.
 
 Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007-2010 Freeside Internet Services, Inc.
+Copyright (c) 2007-2013 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -785,8 +760,8 @@ indices method should be a setter, not just a getter?
 
 =head1 SEE ALSO
 
-L<DBIx::DBSchema>, L<DBIx::DBSchema::ColGroup::Unique>,
-L<DBIx::DBSchema::ColGroup::Index>, L<DBIx::DBSchema::Column>, L<DBI>
+L<DBIx::DBSchema>, L<DBIx::DBSchema::Column>, L<DBI>,
+L<DBIx::DBSchema::Index>, L<DBIx::DBSchema::FoeignKey>
 
 =cut
 

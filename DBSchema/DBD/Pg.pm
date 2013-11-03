@@ -1,18 +1,16 @@
 package DBIx::DBSchema::DBD::Pg;
+use base qw(DBIx::DBSchema::DBD);
 
 use strict;
-use vars qw($VERSION @ISA %typemap);
 use DBD::Pg 1.32;
-use DBIx::DBSchema::DBD;
 
-$VERSION = '0.18';
-@ISA = qw(DBIx::DBSchema::DBD);
+our $VERSION = '0.19';
 
 die "DBD::Pg version 1.32 or 1.41 (or later) required--".
     "this is only version $DBD::Pg::VERSION\n"
   if $DBD::Pg::VERSION != 1.32 && $DBD::Pg::VERSION < 1.41;
 
-%typemap = (
+our %typemap = (
   'BLOB'           => 'BYTEA',
   'LONG VARBINARY' => 'BYTEA',
   'TIMESTAMP'      => 'TIMESTAMP WITH TIME ZONE',
@@ -170,6 +168,50 @@ END
   $row->{'indisunique'};
 }
 
+#using this
+#******** QUERY **********
+#SELECT conname,
+#  pg_catalog.pg_get_constraintdef(r.oid, true) as condef
+#FROM pg_catalog.pg_constraint r
+#WHERE r.conrelid = '16457' AND r.contype = 'f' ORDER BY 1;
+#**************************
+
+# what's this do?
+#********* QUERY **********
+#SELECT conname, conrelid::pg_catalog.regclass,
+#  pg_catalog.pg_get_constraintdef(c.oid, true) as condef
+#FROM pg_catalog.pg_constraint c
+#WHERE c.confrelid = '16457' AND c.contype = 'f' ORDER BY 1;
+#**************************
+
+sub constraints {
+  my($proto, $dbh, $table) = @_;
+  my $sth = $dbh->prepare(<<END) or die $dbh->errstr;
+    SELECT conname, pg_catalog.pg_get_constraintdef(r.oid, true) as condef
+      FROM pg_catalog.pg_constraint r
+        WHERE r.conrelid = ( SELECT oid FROM pg_class
+                               WHERE relname = '$table'
+                                 AND pg_catalog.pg_table_is_visible(oid)
+                           )
+          AND r.contype = 'f'
+END
+  $sth->execute;
+
+  map { $_->{condef}
+          =~ /^FOREIGN KEY \(([\w\, ]+)\) REFERENCES (\w+)\(([\w\, ]+)\)\s*(.*)$/
+            or die "unparsable constraint: ". $_->{condef};
+        my($columns, $table, $references, $etc ) = ($1, $2, $3, $4);
+        +{ 'constraint' => $_->{conname},
+           'columns'    => [ split(/,\s*/, $columns) ],
+           'table'      => $table,
+           'references' => [ split(/,\s*/, $references) ],
+           #XXX $etc not handled yet for MATCH, ON DELETE, ON UPDATE
+         };
+      }
+    grep $_->{condef} =~ /^\s*FOREIGN\s+KEY/,
+      @{ $sth->fetchall_arrayref( {} ) };
+}
+
 sub add_column_callback {
   my( $proto, $dbh, $table, $column_obj ) = @_;
   my $name = $column_obj->name;
@@ -270,7 +312,7 @@ sub alter_column_callback {
     if ( $pg_server_version >= 80000 ) {
 
       $hashref->{'sql_alter_type'} =
-        "ALTER TABLE $table ALTER COLUMN ". $new_column->name.
+        "ALTER COLUMN ". $new_column->name.
         " TYPE ". $new_column->type.
         ( ( defined($new_column->length) && $new_column->length )
               ? '('.$new_column->length.')'
@@ -349,14 +391,12 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 
 Copyright (c) 2000 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2009-2010 Freeside Internet Services, Inc.
+Copyright (c) 2009-2013 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
 
 =head1 BUGS
-
-Yes.
 
 columns doesn't return column default information.
 

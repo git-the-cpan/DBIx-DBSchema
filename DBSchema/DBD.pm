@@ -1,9 +1,8 @@
 package DBIx::DBSchema::DBD;
 
 use strict;
-use vars qw($VERSION);
 
-$VERSION = '0.07';
+our $VERSION = '0.08';
 
 =head1 NAME
 
@@ -152,6 +151,35 @@ Inheriting from DBIx::DBSchema::DBD will provide the default empty string.
 
 sub default_db_schema { ''; }
 
+=item constraints CLASS DBI_DBH TABLE
+
+Given an active DBI database handle, return the constraints (currently, foreign
+keys) for the specified table, as a list of hash references.
+
+Each hash reference has the following keys:
+
+=over 8
+
+=item constraint - contraint name
+
+=item columns - List refrence of column names
+
+=item table - Foreign taable name
+
+=item references - List reference of column names in foreign table
+
+=item match - 
+
+=item on_delete - 
+
+=item on_update -
+
+=back
+
+=cut
+
+sub constraints { (); }
+
 =item column_callback DBH TABLE_NAME COLUMN_OBJ
 
 Optional callback for driver-specific overrides to SQL column definitions.
@@ -258,7 +286,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2005 Ivan Kohler
-Copyright (c) 2007-2010 Freeside Internet Services, Inc.
+Copyright (c) 2007-2013 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

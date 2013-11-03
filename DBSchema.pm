@@ -1,19 +1,19 @@
 package DBIx::DBSchema;
 
 use strict;
-use vars qw($VERSION $DEBUG $errstr);
 use Storable;
 use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
 use DBIx::DBSchema::Table 0.08;
 use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
-use DBIx::DBSchema::ColGroup::Unique;
-use DBIx::DBSchema::ColGroup::Index;
+use DBIx::DBSchema::ForeignKey;
 
-$VERSION = "0.40";
+our $VERSION = '0.42';
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
-$DEBUG = 0;
+our $DEBUG = 0;
+
+our $errstr;
 
 =head1 NAME
 
@@ -56,8 +56,8 @@ you can create a database schema with an OO Perl interface.  You can read the
 schema from an existing database.  You can save the schema to disk and restore
 it in a different process.  You can write SQL CREATE statements statements for
 different databases from a single source.  In recent versions, you can
-transform one schema to another, adding any necessary new columns and tables
-(and, as of 0.33, indices).
+transform one schema to another, adding any necessary new columns, tables,
+indices and foreign keys.
 
 Currently supported databases are MySQL, PostgreSQL and SQLite.  Sybase and
 Oracle drivers are partially implemented.  DBIx::DBSchema will attempt to use
@@ -420,7 +420,20 @@ sub pretty_print {
               }
               keys %indices
 
-        ). "\n               }, \n"
+        ). "\n               }, \n".
+
+        #foreign_keys
+        "  'foreign_keys' => [ ". join( ",\n                 ",
+
+          map { my $name = $_->constraint;
+                "'$name' => { \n".
+                "                 },\n";
+              }
+            $table->foreign_keys
+
+        ). "\n               ], \n"
+
+      ;
 
     } $self->tables
   ). "}\n";
@@ -458,11 +471,7 @@ sub pretty_read {
       'primary_key' => $info->{'primary_key'},
       'columns'     => \@columns,
 
-      #old-style indices 
-      'unique'      => DBIx::DBSchema::ColGroup::Unique->new($info->{'unique'}),
-      'index'       => DBIx::DBSchema::ColGroup::Index->new($info->{'index'}),
-
-      #new-style indices
+      #indices
       'indices'     => [ map { my $idx_info = $info->{'indices'}{$_};
                                DBIx::DBSchema::Index->new({
                                  'name'    => $_,
@@ -522,7 +531,7 @@ items/projects below under BUGS.
 
 Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007-2010 Freeside Internet Services, Inc.
+Copyright (c) 2007-2013 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -531,14 +540,21 @@ the same terms as Perl itself.
 
 Multiple primary keys are not yet supported.
 
-Foreign keys and other constraints are not yet supported.
-
-sql_update_schema doesn't deal with deleted columns yet.
+Foreign keys: need to support dropping, NOT VALID, reverse engineering w/mysql
 
 Need to port and test with additional databases
 
 Each DBIx::DBSchema object should have a name which corresponds to its name
 within the SQL database engine (DBI data source).
+
+Need to support "using" index attribute in pretty_read and in reverse
+engineering
+
+sql CREATE TABLE output should convert integers
+(i.e. use DBI qw(:sql_types);) to local types using DBI->type_info plus a hash
+to fudge things
+
+=head2 PRETTY_ BUGS
 
 pretty_print is actually pretty ugly.
 
@@ -553,15 +569,8 @@ when nothing is given in the read.
 Perhaps pretty_read should eval column types so that we can use DBI
 qw(:sql_types) here instead of externally.
 
-Need to support "using" index attribute in pretty_read and in reverse
-engineering
-
 perhaps we should just get rid of pretty_read entirely.  pretty_print is useful
 for debugging, but pretty_read is pretty bunk.
-
-sql CREATE TABLE output should convert integers
-(i.e. use DBI qw(:sql_types);) to local types using DBI->type_info plus a hash
-to fudge things
 
 =head1 SEE ALSO
 

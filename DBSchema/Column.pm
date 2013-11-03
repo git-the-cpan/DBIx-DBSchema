@@ -325,10 +325,16 @@ sub quoted_default {
 
 }
 
-=item sql_add_column [ DBH ] 
+=item sql_add_column [ DBH ]
 
-Returns a list of SQL statements to add this column to an existing table.  (To
-create a new table, see L<DBIx::DBSchema::Table/sql_create_table> instead.)
+Returns SQL to add this column to an existing table.  (To create a new table,
+see L<DBIx::DBSchema::Table/sql_create_table> instead.)
+
+NOTE: This interface has changed in 0.41
+
+Returns two listrefs.  The first is a list of column alteration SQL fragments
+for an ALTER TABLE statement.  The second is a list of full SQL statements that
+should be run after the ALTER TABLE statement.
 
 The data source can be specified by passing an open DBI database handle, or by
 passing the DBI data source name, username and password.  
@@ -352,6 +358,7 @@ sub sql_add_column {
 
   my $driver = $dbh ? _load_driver($dbh) : '';
 
+  my @alter_table = ();
   my @sql = ();
   my $table = $self->table_name;
 
@@ -370,7 +377,7 @@ sub sql_add_column {
     $self->null($hashref->{'effective_null'});
   }
 
-  push @sql, "ALTER TABLE $table ADD COLUMN ". $self->line($dbh);
+  push @alter_table, "ADD COLUMN ". $self->line($dbh);
 
   push @sql, @{ $hashref->{'sql_after'} } if $hashref->{'sql_after'};
 
@@ -381,14 +388,20 @@ sub sql_add_column {
   $self->type($real_type) if $real_type;
   $self->null($real_null) if defined $real_null;
 
-  @sql;
+  (\@alter_table, \@sql);
 
 }
 
 =item sql_alter_column PROTOTYPE_COLUMN  [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
 
-Returns a list of SQL statements to alter this column so that it is identical
-to the provided prototype column, also a DBIx::DBSchema::Column object.
+Returns SQL to alter this column so that it is identical to the provided
+prototype column, also a DBIx::DBSchema::Column object.
+
+NOTE: This interface has changed in 0.41
+
+Returns two listrefs.  The first is a list of column alteration SQL fragments
+for an ALTER TABLE statement.  The second is a list of full SQL statements that
+should be run after the ALTER TABLE statement.
 
 Optionally, the data source can be specified by passing an open DBI database
 handle, or by passing the DBI data source name, username and password.  
@@ -413,6 +426,7 @@ sub sql_alter_column {
 
   my $driver = $dbh ? _load_driver($dbh) : '';
 
+  my @alter_table = ();
   my @sql = ();
 
   my $dbd = "DBIx::DBSchema::DBD::$driver";
@@ -429,7 +443,7 @@ sub sql_alter_column {
 
     # change the type...
     if ( $hashref->{'sql_alter_type'} ) {
-      push @sql, $hashref->{'sql_alter_type'};
+      push @alter_table, $hashref->{'sql_alter_type'};
     }
 
     # change nullability...
@@ -443,7 +457,7 @@ sub sql_alter_column {
       # change nullability from NOT NULL to NULL
       if ( ! $self->null && $new->null ) {
     
-        push @sql, "ALTER TABLE $table ALTER COLUMN $name DROP NOT NULL";
+        push @alter_table, "ALTER COLUMN $name DROP NOT NULL";
     
       }
     
@@ -452,7 +466,7 @@ sub sql_alter_column {
       # the table first...
       if ( $self->null && ! $new->null ) {
     
-        push @sql, "ALTER TABLE $table ALTER COLUMN $name SET NOT NULL";
+        push @alter_table, "ALTER COLUMN $name SET NOT NULL";
     
       }
 
@@ -468,13 +482,13 @@ sub sql_alter_column {
 
       #warn "old default: $old_default / new default: $new_default\n";
 
-      my $alter = "ALTER TABLE $table ALTER COLUMN $name";
+      my $alter = "ALTER COLUMN $name";
 
       if ( $new_default ne '' ) {
         #warn "changing from $old_default to $new_default\n";
-        push @sql, "$alter SET DEFAULT $new_default";
+        push @alter_table, "$alter SET DEFAULT $new_default";
       } elsif ( $old_default !~ /^nextval/i ) { #Pg-specific :(
-        push @sql, "$alter DROP DEFAULT";
+        push @alter_table, "$alter DROP DEFAULT";
 
         push @sql, "UPDATE TABLE $table SET $name = NULL WHERE $name = ''"
           if $opt->{'nullify_default'} && $old_default eq "''" && $new->null;
@@ -486,13 +500,17 @@ sub sql_alter_column {
 
   }
 
-  @sql;
+  (\@alter_table, \@sql);
 
 }
 
 =item sql_drop_column [ DBH ] 
 
-Returns a list of SQL statements to drop this column from an existing table.
+Returns SQL to drop this column from an existing table.
+
+NOTE: This interface has changed in 0.41
+
+Returns a list of column alteration SQL fragments for an ALTER TABLE statement. 
 
 The optional database handle or DBI data source/username/password is not yet
 used.
@@ -505,7 +523,7 @@ sub sql_drop_column {
  my $table = $self->table_name;
  my $name = $self->name;
  
- ("ALTER TABLE $table DROP COLUMN $name"); # XXX what about indexes???
+ ("DROP COLUMN $name"); # XXX what about indexes???
 }
 
 =back
@@ -517,7 +535,7 @@ Ivan Kohler <ivan-dbix-dbschema@420.am>
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2006 Ivan Kohler
-Copyright (c) 2007-2010 Freeside Internet Services, Inc.
+Copyright (c) 2007-2013 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

@@ -1,5 +1,14 @@
 Revision history for Perl extension DBIx::DBSchema.
 
+0.42 Sun Nov  3 01:09:27 PST 2013
+        - Basic foreign key support
+          + table creation
+          + table alteration (adding new foreign keys)
+          + reverse-engineering (Pg driver)
+
+0.41_01 unreleased
+        - consolidate multiple ADD/ALTER COLUMN statements into one ALTER TABLE
+
 0.40 Sat Dec 17 17:03:51 PST 2011
         - doc: sql_update_schema link to sql_add_column misspelled
         - Pg: fix mapping for DOUBLE PRECISION type to avoid needless alter cols
