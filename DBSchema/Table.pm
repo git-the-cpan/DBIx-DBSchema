@@ -7,7 +7,7 @@ use DBIx::DBSchema::Column 0.14;
 use DBIx::DBSchema::Index;
 use DBIx::DBSchema::ForeignKey;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 our $DEBUG = 0;
 
 =head1 NAME
@@ -435,9 +435,6 @@ sub unique_singles {
 
 Returns a list of SQL statments to create this table.
 
-Optionally, the data source can be specified by passing an open DBI database
-handle, or by passing the DBI data source name, username and password.  
-
 The data source can be specified by passing an open DBI database handle, or by
 passing the DBI data source name, username and password.  
 
@@ -475,7 +472,7 @@ sub sql_create_table {
   push @columns, "PRIMARY KEY (". $self->primary_key. ")"
     if $self->primary_key && ! grep /PRIMARY KEY/i, @columns;
 
-  push @columns, $self->foreign_keys_sql;
+#  push @columns, $self->foreign_keys_sql;
 
   my $indexnum = 1;
 
@@ -483,33 +480,6 @@ sub sql_create_table {
     "CREATE TABLE ". $self->name. " (\n  ". join(",\n  ", @columns). "\n)\n".
     $self->local_options
   );
-
-  if ( $self->_unique ) {
-
-    warn "WARNING: DBIx::DBSchema::Table object for ". $self->name.
-         " table has deprecated (non-named) unique indices\n";
-
-    push @r, map {
-                   #my($index) = $self->name. "__". $_ . "_idx";
-                   #$index =~ s/,\s*/_/g;
-                   my $index = $self->name. $indexnum++;
-                   "CREATE UNIQUE INDEX $index ON ". $self->name. " ($_)\n"
-                 } $self->unique->sql_list;
-
-  }
-
-  if ( $self->_index ) {
-
-    warn "WARNING: DBIx::DBSchema::Table object for ". $self->name.
-         " table has deprecated (non-named) indices\n";
-
-    push @r, map {
-                   #my($index) = $self->name. "__". $_ . "_idx";
-                   #$index =~ s/,\s*/_/g;
-                   my $index = $self->name. $indexnum++;
-                   "CREATE INDEX $index ON ". $self->name. " ($_)\n"
-                 } $self->index->sql_list;
-  }
 
   my %indices = $self->indices;
   #push @r, map { $indices{$_}->sql_create_index( $self->name ) } keys %indices;
@@ -519,6 +489,32 @@ sub sql_create_table {
 
   #$self->primary_key($saved_pkey) if $saved_pkey;
   @r;
+}
+
+=item sql_add_constraints [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
+
+Returns a list of SQL statments to add constraints (foreign keys) to this table.
+
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and the quoting and type mapping will be more
+reliable.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database', will use
+MySQL- or PostgreSQL-specific syntax.  Non-standard syntax for other engines
+(if applicable) may also be supported in the future.
+
+=cut
+
+sub sql_add_constraints {
+  my $self = shift;
+  my @fks = $self->foreign_keys_sql or return ();
+  (
+    'ALTER TABLE '. $self->name. ' '. join(",\n  ", map "ADD $_", @fks) 
+  );
 }
 
 =item sql_alter_table PROTOTYPE_TABLE, [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
@@ -657,19 +653,6 @@ sub sql_alter_table {
   }
 
   ###
-  # foreign keys (add)
-  ###
-
-  foreach my $foreign_key ( $new->foreign_keys ) {
-
-    next if grep $foreign_key->cmp($_), $self->foreign_keys;
-
-    push @at, 'ADD '. $foreign_key->sql_foreign_key;
-  }
-
-  # XXX foreign keys modify / drop
-  
-  ###
   # return the statements
   ###
 
@@ -681,6 +664,62 @@ sub sql_alter_table {
     if $DEBUG && @r;
 
   @r;
+
+}
+
+=item sql_alter_constraints PROTOTYPE_TABLE, [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
+
+Returns a list of SQL statements to alter this table's constraints (foreign
+keys) so that they are identical to the provided table, also a
+DBIx::DBSchema::Table object.
+
+The data source can be specified by passing an open DBI database handle, or by
+passing the DBI data source name, username and password.  
+
+Although the username and password are optional, it is best to call this method
+with a database handle or data source including a valid username and password -
+a DBI connection will be opened and used to check the database version as well
+as for more reliable quoting and type mapping.  Note that the database
+connection will be used passively, B<not> to actually run the CREATE
+statements.
+
+If passed a DBI data source (or handle) such as `DBI:mysql:database' or
+`DBI:Pg:dbname=database', will use syntax specific to that database engine.
+Currently supported databases are MySQL and PostgreSQL.
+
+If not passed a data source (or handle), or if there is no driver for the
+specified database, will attempt to use generic SQL syntax.
+
+=cut
+
+sub sql_alter_constraints {
+  my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
+
+  my $driver = _load_driver($dbh);
+
+  my $table = $self->name;
+
+  my @at = ();
+
+  ###
+  # foreign keys (add)
+  ###
+
+  foreach my $foreign_key ( $new->foreign_keys ) {
+
+    next if grep $foreign_key->cmp($_), $self->foreign_keys;
+
+    push @at, 'ADD '. $foreign_key->sql_foreign_key;
+  }
+
+  ###
+  # XXX TODO foreign keys modify / drop
+  ###
+
+  return () unless @at;
+  (
+    'ALTER TABLE '. $self->name. ' '. join(",\n  ", @at) 
+  );
 
 }
 

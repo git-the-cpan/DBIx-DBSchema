@@ -5,8 +5,8 @@ WriteMakefile(
     'NAME'	=> 'DBIx::DBSchema',
     'VERSION_FROM' => 'DBSchema.pm', # finds $VERSION
     'PREREQ_PM'    => {
-                        'DBI' => 0,
-                        'FreezeThaw' => 0,
+                        'DBI'      => 0,
+                        #'FreezeThaw' => 0,
                         'Storable' => 0,
                       },
 );

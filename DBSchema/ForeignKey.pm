@@ -20,7 +20,9 @@ DBIx::DBSchema::ForeignKey - Foreign key objects
   );
 
   $foreign_key = new DBIx::DBSchema::ForeignKey (
-    { 'columns'    => [ 'column_name', 'column2' ],
+    {
+      'constraint' => 'constraint_name',
+      'columns'    => [ 'column_name', 'column2' ],
       'table'      => 'foreign_table',
       'references' => [ 'foreign_column', 'foreign_column2' ],
       'match'      => 'MATCH FULL', # or MATCH SIMPLE

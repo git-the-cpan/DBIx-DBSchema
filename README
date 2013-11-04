@@ -11,9 +11,8 @@ This module implements an OO-interface to database schemas.  Using this module,
 you can create a database schema with an OO Perl interface.  You can read the
 schema from an existing database.  You can save the schema to disk and restore
 it from different process.  You can write SQL CREATE statements statements for
-different databases from a single source.  In recent versions, you can
-transform one schema to another, adding any necessary new columns and tables
-(and, as of 0.33, indices).
+different databases from a single source.  You can transform one schema to
+another, adding any necessary new columns, tables, indices and foreign keys.
 
 Currently supported databases are MySQL, PostgreSQL, and SQLite.  Sybase and
 Oracle drivers are partially implemented.  DBIx::DBSchema will attempt to use

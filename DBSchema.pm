@@ -8,7 +8,7 @@ use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ForeignKey;
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 our $DEBUG = 0;
@@ -55,9 +55,8 @@ This module implements an OO-interface to database schemas.  Using this module,
 you can create a database schema with an OO Perl interface.  You can read the
 schema from an existing database.  You can save the schema to disk and restore
 it in a different process.  You can write SQL CREATE statements statements for
-different databases from a single source.  In recent versions, you can
-transform one schema to another, adding any necessary new columns, tables,
-indices and foreign keys.
+different databases from a single source.  You can transform one schema to
+another, adding any necessary new columns, tables, indices and foreign keys.
 
 Currently supported databases are MySQL, PostgreSQL and SQLite.  Sybase and
 Oracle drivers are partially implemented.  DBIx::DBSchema will attempt to use
@@ -236,7 +235,10 @@ specified database, will attempt to use generic SQL syntax.
 
 sub sql {
   my($self, $dbh) = ( shift, _dbh(@_) );
-  map { $self->table($_)->sql_create_table($dbh); } $self->tables;
+  ( 
+    ( map { $self->table($_)->sql_create_table($dbh); } $self->tables ),
+    ( map { $self->table($_)->sql_add_constraints($dbh); } $self->tables ),
+  );
 }
 
 =item sql_update_schema [ OPTIONS_HASHREF, ] PROTOTYPE_SCHEMA [ DATABASE_HANDLE | DATA_SOURCE [ USERNAME PASSWORD [ ATTR ] ] ]
@@ -279,6 +281,7 @@ sub sql_update_schema {
   my($self, $opt, $new, $dbh) = ( shift, _parse_opt(\@_), shift, _dbh(@_) );
 
   my @r = ();
+  my @later = ();
 
   foreach my $table ( $new->tables ) {
   
@@ -286,17 +289,19 @@ sub sql_update_schema {
   
       warn "$table exists\n" if $DEBUG > 1;
 
-      push @r, $self->table($table)->sql_alter_table( $new->table($table),
-                                                      $dbh,
-                                                      $opt
-                                                    );
+      push @r,
+        $self->table($table)->sql_alter_table( $new->table($table),
+                                                 $dbh, $opt );
+      push @later,
+        $self->table($table)->sql_alter_constraints( $new->table($table),
+                                                       $dbh, $opt );
 
     } else {
   
       warn "table $table does not exist.\n" if $DEBUG;
 
-      push @r, 
-        $new->table($table)->sql_create_table( $dbh );
+      push @r,     $new->table($table)->sql_create_table(    $dbh );
+      push @later, $new->table($table)->sql_add_constraints( $dbh );
   
     }
   
@@ -316,6 +321,8 @@ sub sql_update_schema {
     }
 
   }
+
+  push @r, @later;
 
   warn join("\n", @r). "\n"
     if $DEBUG > 1;

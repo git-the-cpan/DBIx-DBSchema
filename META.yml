@@ -19,6 +19,5 @@ no_index:
     - inc
 requires:
   DBI: 0
-  FreezeThaw: 0
   Storable: 0
-version: 0.42
+version: 0.43
