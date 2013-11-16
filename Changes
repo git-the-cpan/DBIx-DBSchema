@@ -1,5 +1,12 @@
 Revision history for Perl module DBIx::DBSchema
 
+0.44 2013-11-15 17:54:37 PST
+    - POD fixes from Xavier Guimard <x.guimard@free.fr> and Damyan Ivanov
+      <dmn@debian.org> of the Debian Perl Group, closes: CPAN#82187
+    - More foreign key support
+      + Table alteration (removing foreign keys)
+      + Fix MATCH / ON DELETE / ON UPDATE
+
 0.43 2013-11-04 14:58;32 PST
     - Incorporate CPAN::Changes::Spec-compliant Changes file from Neil Bowers
       <neilb@cpan.org>, closes: CPAN#90023, thanks!

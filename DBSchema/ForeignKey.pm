@@ -2,7 +2,7 @@ package DBIx::DBSchema::ForeignKey;
 
 use strict;
 
-our $VERSION = '0.1';
+our $VERSION = '0.13';
 our $DEBUG = 0;
 
 =head1 NAME
@@ -77,7 +77,7 @@ sub new {
 
 =item constraint [ CONSTRAINT_NAME ]
 
-Returns or sets the foreign table name
+Returns or sets the constraint name
 
 =cut
 
@@ -169,7 +169,7 @@ sub match {
   if ( defined($value) ) {
     $self->{match} = $value;
   } else {
-    $self->{match};
+    defined($self->{match}) ? $self->{match} : '';
   }
 }
 
@@ -184,7 +184,7 @@ sub on_delete {
   if ( defined($value) ) {
     $self->{on_delete} = $value;
   } else {
-    $self->{on_delete};
+    defined($self->{on_delete}) ? $self->{on_delete} : '';
   }
 }
 
@@ -199,11 +199,9 @@ sub on_update {
   if ( defined($value) ) {
     $self->{on_update} = $value;
   } else {
-    $self->{on_update};
+    defined($self->{on_update}) ? $self->{on_update} : '';
   }
 }
-
-
 
 =item sql_foreign_key
 
@@ -219,7 +217,10 @@ sub sql_foreign_key {
   my $ref_sql = $self->references_sql;
 
   "FOREIGN KEY ( $col_sql ) REFERENCES $table ( $ref_sql ) ".
-    join ' ', grep $_, map $self->$_, qw( match on_delete on_update );
+    join ' ', map { (my $thing_sql = uc($_) ) =~ s/_/ /g;
+                    "$thing_sql ". $self->$_;
+                  }
+                grep $self->$_, qw( match on_delete on_update );
 }
 
 =item cmp OTHER_INDEX_OBJECT
@@ -233,8 +234,11 @@ sub cmp {
   my( $self, $other ) = @_;
 
   $self->table eq $other->table
-    and $self->columns_sql eq $other->columns_sql
+    and $self->columns_sql    eq $other->columns_sql
     and $self->references_sql eq $other->references_sql
+    and uc($self->match)      eq uc($other->match)
+    and uc($self->on_delete)  eq uc($other->on_delete)
+    and uc($self->on_update)  eq uc($other->on_update)
   ;
 }
 

@@ -8,7 +8,7 @@ use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ForeignKey;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 our $DEBUG = 0;
@@ -446,12 +446,10 @@ sub pretty_print {
   ). "}\n";
 }
 
-=cut
-
 =item pretty_read HASHREF
 
 This method is B<not> recommended.  If you need to load and save your schema
-to a file, see the L</load|load> and L</save|save> methods.
+to a file, see the L</load> and L</save> methods.
 
 Creates a schema as specified by a data structure such as that created by
 B<pretty_print> method.

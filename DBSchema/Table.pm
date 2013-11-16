@@ -5,9 +5,9 @@ use Carp;
 use DBIx::DBSchema::_util qw(_load_driver _dbh _parse_opt);
 use DBIx::DBSchema::Column 0.14;
 use DBIx::DBSchema::Index;
-use DBIx::DBSchema::ForeignKey;
+use DBIx::DBSchema::ForeignKey 0.13;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 our $DEBUG = 0;
 
 =head1 NAME
@@ -701,10 +701,7 @@ sub sql_alter_constraints {
 
   my @at = ();
 
-  ###
   # foreign keys (add)
-  ###
-
   foreach my $foreign_key ( $new->foreign_keys ) {
 
     next if grep $foreign_key->cmp($_), $self->foreign_keys;
@@ -712,9 +709,14 @@ sub sql_alter_constraints {
     push @at, 'ADD '. $foreign_key->sql_foreign_key;
   }
 
-  ###
-  # XXX TODO foreign keys modify / drop
-  ###
+  #foreign keys (drop)
+  foreach my $foreign_key ( $self->foreign_keys ) {
+
+    next if grep $foreign_key->cmp($_), $new->foreign_keys;
+    next unless $foreign_key->constraint;
+
+    push @at, 'DROP CONSTRAINT '. $foreign_key->constraint;
+  }
 
   return () unless @at;
   (

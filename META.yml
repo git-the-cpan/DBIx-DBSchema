@@ -20,4 +20,4 @@ no_index:
 requires:
   DBI: 0
   Storable: 0
-version: 0.43
+version: 0.44
