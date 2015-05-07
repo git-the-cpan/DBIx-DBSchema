@@ -139,6 +139,15 @@ sub column_callback {
 
   }
 
+  # MySQL no longer supports defaults for text/blob columns
+  if ( $column_obj->type =~ /(TEXT|BLOB)/i
+       and defined $column_obj->default ) {
+
+    # There's no way to unset the default cleanly.
+    # An empty string isn't quite right.
+    $column_obj->{'default'} = undef;
+  }
+
   $hashref;
 
 }

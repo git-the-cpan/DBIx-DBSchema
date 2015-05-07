@@ -1,5 +1,12 @@
 Revision history for Perl module DBIx::DBSchema
 
+0.45 Wed May  6 22:17:33 PDT 2015
+    - MySQL does not support DEFAULT for TEXT/BLOB columns, closes: CPAN#58505
+    - doc: Add repository information
+    - fix SQLite reverse-engineering, closes: CPAN#95961
+    - fix Pg reverse-engineering of foreign key MATCH/ON DELETE/ON UPDATE
+      clauses
+
 0.44 2013-11-15 17:54:37 PST
     - POD fixes from Xavier Guimard <x.guimard@free.fr> and Damyan Ivanov
       <dmn@debian.org> of the Debian Perl Group, closes: CPAN#82187

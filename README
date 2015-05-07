@@ -2,7 +2,7 @@ DBIx::DBSchema
 
 Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007-2013 Freeside Internet Services, Inc.
+Copyright (c) 2007-2015 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
@@ -28,14 +28,6 @@ To install:
 
 Documentation will then be available via `man DBIx::DBSchema' or
 `perldoc DBIx::DBSchema'.
-
-Anonymous CVS access is available:
-  $ export CVSROOT=":pserver:anonymous@cvs.420.am:/home/cvs/cvsroot"
-  $ cvs login
-  (Logging in to anonymous@cvs.420.am)
-  CVS password: anonymous
-  $ cvs checkout DBIx-DBSchema
-as well as <http://www.420.am/cgi-bin/viewvc.cgi/DBIx-DBSchema>.
 
 Homepage: <http://www.420.am/dbix-dbschema>
 

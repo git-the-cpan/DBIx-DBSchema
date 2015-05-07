@@ -21,5 +21,6 @@ t/load-pg.t
 t/load-sqlite.t
 t/load-sybase.t
 t/load.t
+t/mysql-text-default.t
 META.yml                                 Module YAML meta-data (added by MakeMaker)
 META.json                                Module JSON meta-data (added by MakeMaker)

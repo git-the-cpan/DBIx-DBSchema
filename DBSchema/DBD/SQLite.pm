@@ -1,11 +1,10 @@
 package DBIx::DBSchema::DBD::SQLite;
+use base qw( DBIx::DBSchema::DBD );
 
 use strict;
-use vars qw($VERSION @ISA %typemap);
-use DBIx::DBSchema::DBD;
+use vars qw($VERSION %typemap);
 
-$VERSION = '0.02';
-@ISA = qw(DBIx::DBSchema::DBD);
+$VERSION = '0.03';
 
 %typemap = (
   'SERIAL' => 'INTEGER PRIMARY KEY AUTOINCREMENT',
@@ -50,7 +49,7 @@ driver-specific use (which for sqlite is whether this col is a primary key)
 
 sub columns {
     my ( $proto, $dbh, $table ) = @_;
-    my $sth  = $dbh->prepare('PRAGMA table_info($table)');
+    my $sth  = $dbh->prepare("PRAGMA table_info($table)");
         $sth->execute();
     my $rows = [];
 

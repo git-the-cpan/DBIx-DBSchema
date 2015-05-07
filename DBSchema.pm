@@ -8,7 +8,7 @@ use DBIx::DBSchema::Index;
 use DBIx::DBSchema::Column;
 use DBIx::DBSchema::ForeignKey;
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 $VERSION = eval $VERSION; # modperlstyle: convert the string into a number
 
 our $DEBUG = 0;
@@ -532,11 +532,23 @@ bugfixes and more.
 Contributions are welcome!  I'm especially keen on any interest in the top
 items/projects below under BUGS.
 
+=head1 REPOSITORY
+
+The code is available from our public git repository:
+
+  git clone git://git.freeside.biz/DBIx-DBSchema.git
+
+Or on the web:
+
+  http://freeside.biz/gitweb/?p=DBIx-DBSchema.git
+  Or:
+  http://freeside.biz/gitlist/DBIx-DBSchema.git
+
 =head1 COPYRIGHT
 
 Copyright (c) 2000-2007 Ivan Kohler
 Copyright (c) 2000 Mail Abuse Prevention System LLC
-Copyright (c) 2007-2013 Freeside Internet Services, Inc.
+Copyright (c) 2007-2015 Freeside Internet Services, Inc.
 All rights reserved.
 This program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

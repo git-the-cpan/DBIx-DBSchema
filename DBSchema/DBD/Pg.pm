@@ -2,13 +2,9 @@ package DBIx::DBSchema::DBD::Pg;
 use base qw(DBIx::DBSchema::DBD);
 
 use strict;
-use DBD::Pg 1.32;
+use DBD::Pg 1.41;
 
-our $VERSION = '0.19';
-
-die "DBD::Pg version 1.32 or 1.41 (or later) required--".
-    "this is only version $DBD::Pg::VERSION\n"
-  if $DBD::Pg::VERSION != 1.32 && $DBD::Pg::VERSION < 1.41;
+our $VERSION = '0.20';
 
 our %typemap = (
   'BLOB'           => 'BYTEA',
@@ -198,14 +194,19 @@ END
   $sth->execute;
 
   map { $_->{condef}
-          =~ /^FOREIGN KEY \(([\w\, ]+)\) REFERENCES (\w+)\(([\w\, ]+)\)\s*(.*)$/
+        =~ /^FOREIGN KEY \(([\w\, ]+)\) REFERENCES (\w+)\(([\w\, ]+)\)\s*(.*)$/i
             or die "unparsable constraint: ". $_->{condef};
         my($columns, $table, $references, $etc ) = ($1, $2, $3, $4);
+        my $match = ( $etc =~ /MATCH (\w+)/i ) ? "MATCH $1" : '';
+        my $on_delete = ( $etc =~ /ON DELETE ((NO |SET )?\w+)/i ) ? $1 : '';
+        my $on_update = ( $etc =~ /ON UPDATE ((NO |SET )?\w+)/i ) ? $1 : '';
         +{ 'constraint' => $_->{conname},
            'columns'    => [ split(/,\s*/, $columns) ],
            'table'      => $table,
            'references' => [ split(/,\s*/, $references) ],
-           #XXX $etc not handled yet for MATCH, ON DELETE, ON UPDATE
+           'match'      => $match,
+           'on_delete'  => $on_delete,
+           'on_update'  => $on_update,
          };
       }
     grep $_->{condef} =~ /^\s*FOREIGN\s+KEY/,
